@@ -144,19 +144,11 @@ class StabilityImageSD3(StabilityBaseNode):
                 "cfg_scale": ("FLOAT", {"default": 7.0, "min": 0.0, "max": 10.0, "step": 0.1}),
                 "image": ("IMAGE",),
                 "strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "aspect_ratio": ("STRING", {
-                    "default": "1:1",
-                    "options": ["16:9", "1:1", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"]
-                }),
-                "style_preset": ("STRING", {
-                    "default": "none",
-                    "options": [
-                        "none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", 
-                        "digital-art", "enhance", "fantasy-art", "isometric", "line-art", 
-                        "low-poly", "modeling-compound", "neon-punk", "origami", "photographic", 
-                        "pixel-art", "tile-texture"
-                    ]
-                }),
+                "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
+                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
+                                "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
+                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
+                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
             }
         }
 
@@ -173,7 +165,8 @@ class StabilityImageSD3(StabilityBaseNode):
                 image: Optional[torch.Tensor] = None,
                 strength: float = 0.7,
                 aspect_ratio: str = "1:1",
-                style_preset: str = "none") -> Tuple[torch.Tensor]:
+                style_preset: str = "none",
+                output_format: str = "png") -> Tuple[torch.Tensor]:
         """画像を生成"""
         
         # リクエストデータの準備
@@ -182,7 +175,7 @@ class StabilityImageSD3(StabilityBaseNode):
             "model": model,
             "seed": seed,
             "cfg_scale": cfg_scale,
-            "output_format": "png"
+            "output_format": output_format
         }
         
         if negative_prompt:
@@ -388,7 +381,9 @@ class StabilityEdit(StabilityBaseNode):
                 "mask": ("MASK",),
                 "grow_mask": ("INT", {"default": 5, "min": 0, "max": 100}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
+                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
+                                "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
+                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
             }
         }
 
@@ -451,23 +446,15 @@ class StabilityImageUltra(StabilityBaseNode):
         return {
             "required": {
                 "prompt": ("STRING", {"multiline": True}),
-                "aspect_ratio": ("STRING", {
-                    "default": "1:1",
-                    "options": ["16:9", "1:1", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"]
-                }),
+                "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
             },
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "style_preset": ("STRING", {
-                    "default": "none",
-                    "options": [
-                        "none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", 
-                        "digital-art", "enhance", "fantasy-art", "isometric", "line-art", 
-                        "low-poly", "modeling-compound", "neon-punk", "origami", "photographic", 
-                        "pixel-art", "tile-texture"
-                    ]
-                }),
+                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
+                                "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
+                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
+                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
             }
         }
 
@@ -479,7 +466,8 @@ class StabilityImageUltra(StabilityBaseNode):
                 aspect_ratio: str,
                 negative_prompt: str = "",
                 seed: int = 0,
-                style_preset: str = "none") -> Tuple[torch.Tensor]:
+                style_preset: str = "none",
+                output_format: str = "png") -> Tuple[torch.Tensor]:
         """画像を生成"""
         
         # リクエストデータの準備
@@ -487,7 +475,7 @@ class StabilityImageUltra(StabilityBaseNode):
             "prompt": prompt,
             "aspect_ratio": aspect_ratio,
             "seed": seed,
-            "output_format": "png"
+            "output_format": output_format
         }
         
         if negative_prompt:
@@ -516,25 +504,15 @@ class StabilityImageCore(StabilityBaseNode):
     def INPUT_TYPES(s):
         return {
             "required": {
-                "prompt": ("STRING", {"multiline": True}),
-                "aspect_ratio": ("STRING", {
-                    "default": "1:1",
-                    "options": ["16:9", "1:1", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"]
-                }),
+                "prompt": ("STRING", {"default": "", "multiline": True}),
+                "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
+                "negative_prompt": ("STRING", {"default": "", "multiline": True}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
+                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
+                                "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
+                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
+                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
             },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "style_preset": ("STRING", {
-                    "default": "none",
-                    "options": [
-                        "none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", 
-                        "digital-art", "enhance", "fantasy-art", "isometric", "line-art", 
-                        "low-poly", "modeling-compound", "neon-punk", "origami", "photographic", 
-                        "pixel-art", "tile-texture"
-                    ]
-                }),
-            }
         }
 
     RETURN_TYPES = ("IMAGE",)
@@ -545,7 +523,8 @@ class StabilityImageCore(StabilityBaseNode):
                 aspect_ratio: str,
                 negative_prompt: str = "",
                 seed: int = 0,
-                style_preset: str = "none") -> Tuple[torch.Tensor]:
+                style_preset: str = "none",
+                output_format: str = "png") -> Tuple[torch.Tensor]:
         """画像を生成
         
         Returns:
@@ -564,7 +543,7 @@ class StabilityImageCore(StabilityBaseNode):
             "prompt": prompt,
             "aspect_ratio": aspect_ratio,
             "seed": seed,
-            "output_format": "png"  # PNG形式で出力
+            "output_format": output_format
         }
         
         if negative_prompt:

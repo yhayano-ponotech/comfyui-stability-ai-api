@@ -213,3 +213,118 @@ class StabilityAPIClient:
         """
         response = self._make_request('GET', '/v1/user/balance')
         return response.json()['credits']
+
+    def generate_image(self, 
+                      prompt: str,
+                      aspect_ratio: str = "1:1",
+                      negative_prompt: str = "",
+                      seed: int = 0,
+                      style_preset: str = "none",
+                      output_format: str = "png") -> bytes:
+        """画像を生成する
+
+        Parameters
+        ----------
+        prompt : str
+            生成する画像の説明（プロンプト）
+        aspect_ratio : str, optional
+            アスペクト比, by default "1:1"
+            選択肢: "16:9", "1:1", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"
+        negative_prompt : str, optional
+            ネガティブプロンプト, by default ""
+        seed : int, optional
+            シード値, by default 0
+        style_preset : str, optional
+            スタイルプリセット, by default "none"
+            選択肢: "none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", 
+                   "digital-art", "enhance", "fantasy-art", "isometric", "line-art", 
+                   "low-poly", "modeling-compound", "neon-punk", "origami", "photographic", 
+                   "pixel-art", "tile-texture"
+        output_format : str, optional
+            出力フォーマット, by default "png"
+            選択肢: "png", "jpeg", "webp"
+
+        Returns
+        -------
+        bytes
+            生成された画像のバイトデータ
+        """
+        
+        # アスペクト比から画像サイズを決定
+        width, height = self._get_image_size(aspect_ratio)
+        
+        # リクエストデータの準備
+        request_data = {
+            "text_prompts": [
+                {
+                    "text": prompt,
+                    "weight": 1.0
+                }
+            ],
+            "height": height,
+            "width": width,
+            "samples": 1,
+            "steps": 50,
+            "seed": seed,
+            "cfg_scale": 7,
+        }
+        
+        # ネガティブプロンプトが指定されている場合は追加
+        if negative_prompt:
+            request_data["text_prompts"].append({
+                "text": negative_prompt,
+                "weight": -1.0
+            })
+        
+        # スタイルプリセットが指定されている場合は追加
+        if style_preset != "none":
+            request_data["style_preset"] = style_preset
+        
+        # リクエストヘッダーの準備
+        headers = {
+            "Accept": f"image/{output_format}",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}"
+        }
+        
+        # 画像生成APIを実行
+        response = self._make_request('POST', '/v1/generation/image', data=json.dumps(request_data), headers=headers)
+        
+        # 生成された画像のバイトデータを返す
+        return response.content
+
+    def _get_image_size(self, aspect_ratio: str) -> tuple:
+        """
+        アスペクト比から画像サイズを決定
+        
+        Parameters:
+        -----------
+        aspect_ratio : str
+            アスペクト比
+            
+        Returns:
+        --------
+        tuple
+            画像サイズ（幅、高さ）
+        """
+        # アスペクト比から画像サイズを決定
+        if aspect_ratio == "16:9":
+            return 512, 288
+        elif aspect_ratio == "1:1":
+            return 512, 512
+        elif aspect_ratio == "21:9":
+            return 512, 216
+        elif aspect_ratio == "2:3":
+            return 512, 768
+        elif aspect_ratio == "3:2":
+            return 512, 341
+        elif aspect_ratio == "4:5":
+            return 512, 640
+        elif aspect_ratio == "5:4":
+            return 512, 409
+        elif aspect_ratio == "9:16":
+            return 288, 512
+        elif aspect_ratio == "9:21":
+            return 216, 512
+        else:
+            raise ValueError("Invalid aspect ratio")
