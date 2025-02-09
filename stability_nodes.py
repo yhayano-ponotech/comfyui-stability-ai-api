@@ -224,15 +224,9 @@ class StabilityUpscaleCreative(StabilityBaseNode):
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
                 "creativity": ("FLOAT", {"default": 0.3, "min": 0.1, "max": 0.5, "step": 0.01}),
-                "style_preset": ("STRING", {
-                    "default": "none",
-                    "options": [
-                        "none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", 
-                        "digital-art", "enhance", "fantasy-art", "isometric", "line-art", 
-                        "low-poly", "modeling-compound", "neon-punk", "origami", "photographic", 
-                        "pixel-art", "tile-texture"
-                    ]
-                }),
+                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
+                                "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
+                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"],),
             }
         }
 
@@ -286,7 +280,7 @@ class StabilityEdit(StabilityBaseNode):
         return {
             "required": {
                 "image": ("IMAGE",),
-                "edit_type": (["erase", "inpaint", "outpaint", "search-and-replace", "search-and-recolor", "remove-background"], {"default": "erase"}),
+                "edit_type": (["erase", "inpaint", "outpaint", "search-and-replace", "search-and-recolor", "remove-background"],),
                 "prompt": ("STRING", {"multiline": True}),
             },
             "optional": {
@@ -296,7 +290,7 @@ class StabilityEdit(StabilityBaseNode):
                 "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
                 "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
                                 "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
-                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
+                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"],),
             }
         }
 
@@ -611,29 +605,18 @@ class StabilityImageSD3(StabilityBaseNode):
         return {
             "required": {
                 "prompt": ("STRING", {"multiline": True}),
-                "model": ("STRING", {
-                    "default": "sd3.5-large",
-                    "options": [
-                        "sd3-large", "sd3-large-turbo", "sd3-medium",
-                        "sd3.5-large", "sd3.5-large-turbo", "sd3.5-medium"
-                    ]
-                }),
-                "mode": ("STRING", {
-                    "default": "text-to-image",
-                    "options": ["text-to-image", "image-to-image"]
-                }),
+                "model": (["sd3.5-large", "sd3.5-large-turbo", "sd3.5-medium", "sd3-large", "sd3-large-turbo", "sd3-medium"],),
+                "mode": (["text-to-image", "image-to-image"],),
             },
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "cfg_scale": ("FLOAT", {"default": 7.0, "min": 0.0, "max": 10.0, "step": 0.1}),
+                "cfg_scale": ("FLOAT", {"default": 7.0, "min": 1.0, "max": 10.0}),
                 "image": ("IMAGE",),
-                "strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
-                                "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
-                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+                "strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0}),
+                "aspect_ratio": (["1:1", "3:2", "4:3", "16:9", "2:3", "3:4", "9:16"], {"default": "1:1"}),
+                "style_preset": (["none", "enhance", "anime", "photographic", "digital-art", "comic-book", "pixel-art", "cinematic", "3d-model", "origami"], {"default": "none"}),
+                "output_format": (["png", "webp"], {"default": "png"}),
             }
         }
 
@@ -654,51 +637,86 @@ class StabilityImageSD3(StabilityBaseNode):
                 output_format: str = "png") -> Tuple[torch.Tensor]:
         """画像を生成
         
+        Parameters
+        ----------
+        prompt : str
+            生成する画像の説明テキスト
+        model : str
+            使用するモデル
+            - sd3.5-large: 6.5 credits/生成
+            - sd3.5-large-turbo: 4 credits/生成
+            - sd3.5-medium: 3.5 credits/生成
+            - sd3-large: 6.5 credits/生成
+            - sd3-large-turbo: 4 credits/生成
+            - sd3-medium: 3.5 credits/生成
+        mode : str
+            生成モード
+            - text-to-image: プロンプトのみから生成
+            - image-to-image: 入力画像を基に生成
+        negative_prompt : str, optional
+            生成時に避けたい要素を指定するテキスト
+        seed : int, optional
+            乱数シード値、デフォルト: 0
+        cfg_scale : float, optional
+            プロンプトの厳密さ (1.0-10.0)、デフォルト: 7.0
+        image : Optional[torch.Tensor], optional
+            入力画像 (image-to-imageモード時に必須)
+        strength : float, optional
+            入力画像の影響度 (0.0-1.0)、デフォルト: 0.7
+        aspect_ratio : str, optional
+            出力画像のアスペクト比、デフォルト: "1:1"
+        style_preset : str, optional
+            スタイルプリセット、デフォルト: "none"
+        output_format : str, optional
+            出力画像フォーマット、デフォルト: "png"
+
         Returns
-        --------
+        -------
         Tuple[torch.Tensor]
-            生成された画像テンソル。形式は [B,H,W,C]
-            B: バッチサイズ (1)
-            H: 高さ
-            W: 幅
-            C: チャンネル数 (3: RGB)
-            値の範囲は0-1のfloat32型
+            生成された画像テンソル
         """
-        
         # リクエストデータの準備
         data = {
             "prompt": prompt,
-            "aspect_ratio": aspect_ratio,
+            "model": model,
+            "mode": mode,
             "seed": seed,
+            "cfg_scale": cfg_scale,
             "output_format": output_format
         }
         
+        # パラメータのバリデーション
+        if mode == "image-to-image":
+            if image is None:
+                raise ValueError("image-to-imageモードでは入力画像が必須です")
+            if strength is None:
+                raise ValueError("image-to-imageモードではstrengthパラメータが必須です")
+        else:
+            # text-to-imageの場合はアスペクト比を指定
+            data["aspect_ratio"] = aspect_ratio
+
         if negative_prompt:
             data["negative_prompt"] = negative_prompt
-            
+
         if style_preset != "none":
             data["style_preset"] = style_preset
 
-        # APIリクエストを実行（画像データを直接受け取る）
-        headers = {
-            "Accept": "image/*"  # 画像データを直接受け取る
-        }
-        
-        # multipart/form-dataとしてデータを送信
-        files = {}
-        for key, value in data.items():
-            files[key] = (None, str(value))
-            
-        # デバッグ情報を出力
-        print("Request data:", files)
-        print("Request headers:", headers)
-            
-        response = self.client._make_request(
-            "POST", 
-            "/v2beta/stable-image/generate/sd3", 
-            files=files,
-            headers=headers
-        )
+        if mode == "image-to-image":
+            data["strength"] = strength
+
+        # APIリクエストを実行
+        headers = {"Accept": "image/*"}
+        if mode == "image-to-image":
+            files = {
+                "image": ("image.png", self.client.image_to_bytes(image))
+            }
+            response = self.client._make_request(
+                "POST",
+                "/v2beta/stable-image/generate/sd3",
+                data=data,
+                files=files,
+                headers=headers
+            )
         
         # レスポンスのContent-Typeを確認
         print("Response Content-Type:", response.headers.get('content-type'))
@@ -724,7 +742,7 @@ class StabilityImageSD3(StabilityBaseNode):
             image_bytes = response.content
         else:
             raise Exception(f"Unexpected content type: {content_type}")
-        
+
         # バイト列を画像テンソルに変換
         image_tensor = self.client.bytes_to_tensor(image_bytes)
         return (image_tensor,)
