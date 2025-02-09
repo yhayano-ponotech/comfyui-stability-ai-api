@@ -119,94 +119,6 @@ class StabilityImageToVideo(StabilityBaseNode):
                 # 生成完了
                 return (response.content,)
 
-class StabilityImageSD3(StabilityBaseNode):
-    """Stability SD3 Image Generationノード"""
-    
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "prompt": ("STRING", {"multiline": True}),
-                "model": ("STRING", {
-                    "default": "sd3.5-large",
-                    "options": [
-                        "sd3-large", "sd3-large-turbo", "sd3-medium",
-                        "sd3.5-large", "sd3.5-large-turbo", "sd3.5-medium"
-                    ]
-                }),
-                "mode": ("STRING", {
-                    "default": "text-to-image",
-                    "options": ["text-to-image", "image-to-image"]
-                }),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "cfg_scale": ("FLOAT", {"default": 7.0, "min": 0.0, "max": 10.0, "step": 0.1}),
-                "image": ("IMAGE",),
-                "strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
-                                "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
-                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
-            }
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "generate"
-    
-    def generate(self,
-                prompt: str,
-                model: str,
-                mode: str,
-                negative_prompt: str = "",
-                seed: int = 0,
-                cfg_scale: float = 7.0,
-                image: Optional[torch.Tensor] = None,
-                strength: float = 0.7,
-                aspect_ratio: str = "1:1",
-                style_preset: str = "none",
-                output_format: str = "png") -> Tuple[torch.Tensor]:
-        """画像を生成"""
-        
-        # リクエストデータの準備
-        data = {
-            "prompt": prompt,
-            "model": model,
-            "seed": seed,
-            "cfg_scale": cfg_scale,
-            "output_format": output_format
-        }
-        
-        if negative_prompt:
-            data["negative_prompt"] = negative_prompt
-            
-        if style_preset != "none":
-            data["style_preset"] = style_preset
-            
-        if mode == "text-to-image":
-            data["aspect_ratio"] = aspect_ratio
-        elif mode == "image-to-image" and image is not None:
-            data["strength"] = strength
-            files = {"image": ("image.png", self.client.image_to_bytes(image))}
-        else:
-            raise ValueError("image-to-imageモードでは画像が必要です")
-
-        # APIリクエストを実行
-        headers = {"Accept": "image/*"}
-        response = self.client._make_request(
-            "POST", 
-            "/v2beta/stable-image/generate/sd3", 
-            data=data,
-            files=files if mode == "image-to-image" else None,
-            headers=headers
-        )
-        
-        # レスポンスを画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(response.content)
-        return (image_tensor,)
-
 class StabilityUpscaleFast(StabilityBaseNode):
     """Stability Fast Upscalerノード"""
     
@@ -456,6 +368,8 @@ class StabilityImageUltra(StabilityBaseNode):
                                 "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
                                 "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
                 "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+                "image": ("IMAGE",),  # 入力画像（オプション）
+                "strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),  # 画像の影響度
             }
         }
 
@@ -468,10 +382,24 @@ class StabilityImageUltra(StabilityBaseNode):
                 negative_prompt: str = "",
                 seed: int = 0,
                 style_preset: str = "none",
-                output_format: str = "png") -> Tuple[torch.Tensor]:
+                output_format: str = "png",
+                image: Optional[torch.Tensor] = None,
+                strength: float = 0.7) -> Tuple[torch.Tensor]:
         """画像を生成
         
-        Returns:
+        Parameters
+        ----------
+        image : Optional[torch.Tensor]
+            入力画像。以下の制限があります：
+            - 幅: 64px以上16,384px以下
+            - 高さ: 64px以上16,384px以下
+            - 総ピクセル数: 4,096px以上
+        strength : float
+            画像の影響度（0.0〜1.0）。imageパラメータが指定されている場合は必須。
+            0.0: 入力画像とまったく同じ
+            1.0: 入力画像の影響なし
+        
+        Returns
         --------
         Tuple[torch.Tensor]
             生成された画像テンソル。形式は [B,H,W,C]
@@ -482,10 +410,26 @@ class StabilityImageUltra(StabilityBaseNode):
             値の範囲は0-1のfloat32型
         """
         
+        # 入力画像のバリデーション
+        if image is not None:
+            # 画像サイズの取得
+            height, width = image.shape[1:3]
+            
+            # サイズ制限のチェック
+            if width < 64 or width > 16384:
+                raise ValueError(f"画像の幅は64px以上16,384px以下である必要があります。現在の幅: {width}px")
+            if height < 64 or height > 16384:
+                raise ValueError(f"画像の高さは64px以上16,384px以下である必要があります。現在の高さ: {height}px")
+            if width * height < 4096:
+                raise ValueError(f"総ピクセル数は4,096px以上である必要があります。現在のピクセル数: {width * height}px")
+            
+            # strengthパラメータのチェック
+            if strength is None:
+                raise ValueError("strengthパラメータは画像が指定されている場合は必須です")
+        
         # リクエストデータの準備
         data = {
             "prompt": prompt,
-            "aspect_ratio": aspect_ratio,
             "seed": seed,
             "output_format": output_format
         }
@@ -496,13 +440,21 @@ class StabilityImageUltra(StabilityBaseNode):
         if style_preset != "none":
             data["style_preset"] = style_preset
 
+        # 入力画像がある場合（image-to-image）
+        files = {}
+        if image is not None:
+            data["strength"] = strength
+            files["image"] = ("image.png", self.client.image_to_bytes(image))
+        else:
+            # text-to-imageの場合はアスペクト比を指定
+            data["aspect_ratio"] = aspect_ratio
+
         # APIリクエストを実行（画像データを直接受け取る）
         headers = {
             "Accept": "image/*"  # 画像データを直接受け取る
         }
         
         # multipart/form-dataとしてデータを送信
-        files = {}
         for key, value in data.items():
             files[key] = (None, str(value))
             
@@ -576,7 +528,7 @@ class StabilityImageCore(StabilityBaseNode):
                 output_format: str = "png") -> Tuple[torch.Tensor]:
         """画像を生成
         
-        Returns:
+        Returns
         --------
         Tuple[torch.Tensor]
             生成された画像テンソル。形式は [B,H,W,C]
@@ -618,6 +570,132 @@ class StabilityImageCore(StabilityBaseNode):
         response = self.client._make_request(
             "POST", 
             "/v2beta/stable-image/generate/core", 
+            files=files,
+            headers=headers
+        )
+        
+        # レスポンスのContent-Typeを確認
+        print("Response Content-Type:", response.headers.get('content-type'))
+        print("Response status code:", response.status_code)
+        
+        # Content-Typeに基づいて処理を分岐
+        content_type = response.headers.get('content-type', '')
+        if 'application/json' in content_type:
+            # JSONレスポンスの場合
+            response_data = response.json()
+            print("JSON Response:", response_data)
+            if 'artifacts' in response_data and response_data['artifacts']:
+                image_data = response_data['artifacts'][0].get('base64')
+                if image_data:
+                    import base64
+                    image_bytes = base64.b64decode(image_data)
+                else:
+                    raise Exception("No base64 image data in response")
+            else:
+                raise Exception("No artifacts in response")
+        elif 'image/' in content_type:
+            # 画像データの場合
+            image_bytes = response.content
+        else:
+            raise Exception(f"Unexpected content type: {content_type}")
+        
+        # バイト列を画像テンソルに変換
+        image_tensor = self.client.bytes_to_tensor(image_bytes)
+        return (image_tensor,)
+
+class StabilityImageSD3(StabilityBaseNode):
+    """Stability SD3 Image Generationノード"""
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "prompt": ("STRING", {"multiline": True}),
+                "model": ("STRING", {
+                    "default": "sd3.5-large",
+                    "options": [
+                        "sd3-large", "sd3-large-turbo", "sd3-medium",
+                        "sd3.5-large", "sd3.5-large-turbo", "sd3.5-medium"
+                    ]
+                }),
+                "mode": ("STRING", {
+                    "default": "text-to-image",
+                    "options": ["text-to-image", "image-to-image"]
+                }),
+            },
+            "optional": {
+                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
+                "cfg_scale": ("FLOAT", {"default": 7.0, "min": 0.0, "max": 10.0, "step": 0.1}),
+                "image": ("IMAGE",),
+                "strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
+                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
+                                "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
+                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
+                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "generate"
+    
+    def generate(self,
+                prompt: str,
+                model: str,
+                mode: str,
+                negative_prompt: str = "",
+                seed: int = 0,
+                cfg_scale: float = 7.0,
+                image: Optional[torch.Tensor] = None,
+                strength: float = 0.7,
+                aspect_ratio: str = "1:1",
+                style_preset: str = "none",
+                output_format: str = "png") -> Tuple[torch.Tensor]:
+        """画像を生成
+        
+        Returns
+        --------
+        Tuple[torch.Tensor]
+            生成された画像テンソル。形式は [B,H,W,C]
+            B: バッチサイズ (1)
+            H: 高さ
+            W: 幅
+            C: チャンネル数 (3: RGB)
+            値の範囲は0-1のfloat32型
+        """
+        
+        # リクエストデータの準備
+        data = {
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "seed": seed,
+            "output_format": output_format
+        }
+        
+        if negative_prompt:
+            data["negative_prompt"] = negative_prompt
+            
+        if style_preset != "none":
+            data["style_preset"] = style_preset
+
+        # APIリクエストを実行（画像データを直接受け取る）
+        headers = {
+            "Accept": "image/*"  # 画像データを直接受け取る
+        }
+        
+        # multipart/form-dataとしてデータを送信
+        files = {}
+        for key, value in data.items():
+            files[key] = (None, str(value))
+            
+        # デバッグ情報を出力
+        print("Request data:", files)
+        print("Request headers:", headers)
+            
+        response = self.client._make_request(
+            "POST", 
+            "/v2beta/stable-image/generate/sd3", 
             files=files,
             headers=headers
         )
