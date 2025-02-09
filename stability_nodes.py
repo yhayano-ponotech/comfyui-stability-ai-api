@@ -1,6 +1,7 @@
 import torch
 from typing import List, Tuple, Dict, Any, Optional
 from .api_client import StabilityAPIClient
+import json
 
 class StabilityBaseNode:
     """StabilityAI APIノードの基底クラス"""
@@ -468,7 +469,18 @@ class StabilityImageUltra(StabilityBaseNode):
                 seed: int = 0,
                 style_preset: str = "none",
                 output_format: str = "png") -> Tuple[torch.Tensor]:
-        """画像を生成"""
+        """画像を生成
+        
+        Returns:
+        --------
+        Tuple[torch.Tensor]
+            生成された画像テンソル。形式は [B,H,W,C]
+            B: バッチサイズ (1)
+            H: 高さ
+            W: 幅
+            C: チャンネル数 (3: RGB)
+            値の範囲は0-1のfloat32型
+        """
         
         # リクエストデータの準備
         data = {
@@ -484,17 +496,54 @@ class StabilityImageUltra(StabilityBaseNode):
         if style_preset != "none":
             data["style_preset"] = style_preset
 
-        # APIリクエストを実行
-        headers = {"Accept": "image/*"}
+        # APIリクエストを実行（画像データを直接受け取る）
+        headers = {
+            "Accept": "image/*"  # 画像データを直接受け取る
+        }
+        
+        # multipart/form-dataとしてデータを送信
+        files = {}
+        for key, value in data.items():
+            files[key] = (None, str(value))
+            
+        # デバッグ情報を出力
+        print("Request data:", files)
+        print("Request headers:", headers)
+            
         response = self.client._make_request(
             "POST", 
             "/v2beta/stable-image/generate/ultra", 
-            data=data,
+            files=files,
             headers=headers
         )
         
-        # レスポンスを画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(response.content)
+        # レスポンスのContent-Typeを確認
+        print("Response Content-Type:", response.headers.get('content-type'))
+        print("Response status code:", response.status_code)
+        
+        # Content-Typeに基づいて処理を分岐
+        content_type = response.headers.get('content-type', '')
+        if 'application/json' in content_type:
+            # JSONレスポンスの場合
+            response_data = response.json()
+            print("JSON Response:", response_data)
+            if 'artifacts' in response_data and response_data['artifacts']:
+                image_data = response_data['artifacts'][0].get('base64')
+                if image_data:
+                    import base64
+                    image_bytes = base64.b64decode(image_data)
+                else:
+                    raise Exception("No base64 image data in response")
+            else:
+                raise Exception("No artifacts in response")
+        elif 'image/' in content_type:
+            # 画像データの場合
+            image_bytes = response.content
+        else:
+            raise Exception(f"Unexpected content type: {content_type}")
+        
+        # バイト列を画像テンソルに変換
+        image_tensor = self.client.bytes_to_tensor(image_bytes)
         return (image_tensor,)
 
 class StabilityImageCore(StabilityBaseNode):
