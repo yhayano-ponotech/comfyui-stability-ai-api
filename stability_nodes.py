@@ -2,6 +2,9 @@ import torch
 from typing import List, Tuple, Dict, Any, Optional
 from .api_client import StabilityAPIClient
 import json
+import cv2
+import numpy as np
+import io
 
 class StabilityBaseNode:
     """StabilityAI APIノードの基底クラス"""
@@ -9,56 +12,6 @@ class StabilityBaseNode:
 
     def __init__(self):
         self.client = StabilityAPIClient()
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "prompt": ("STRING", {"multiline": True}),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-            }
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "generate"
-    
-    def generate(self,
-                prompt: str,
-                aspect_ratio: str,
-                negative_prompt: str = "",
-                seed: int = 0,
-                style_preset: str = "none") -> Tuple[torch.Tensor]:
-        """画像を生成"""
-
-        # リクエストデータの準備
-        data = {
-            "prompt": prompt,
-            "aspect_ratio": aspect_ratio,
-            "seed": seed,
-            "output_format": "png"
-        }
-        
-        if negative_prompt:
-            data["negative_prompt"] = negative_prompt
-            
-        if style_preset != "none":
-            data["style_preset"] = style_preset
-
-        # APIリクエストを実行
-        headers = {"Accept": "image/*"}
-        response = self.client._make_request(
-            "POST", 
-            "/v2beta/stable-image/generate/core", 
-            data=data,
-            headers=headers
-        )
-        
-        # レスポンスを画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(response.content)
-        return (image_tensor,)
 
 class StabilityImageToVideo(StabilityBaseNode):
     """Stability Image to Videoノード"""
@@ -76,14 +29,14 @@ class StabilityImageToVideo(StabilityBaseNode):
             }
         }
 
-    RETURN_TYPES = ("BYTES",)
+    RETURN_TYPES = ("IMAGE",)
     FUNCTION = "generate"
     
     def generate(self,
                 image: torch.Tensor,
                 seed: int = 0,
                 cfg_scale: float = 1.8,
-                motion_bucket_id: int = 127) -> Tuple[bytes]:
+                motion_bucket_id: int = 127) -> Tuple[torch.Tensor]:
         """画像からビデオを生成"""
         
         # リクエストデータの準備
@@ -107,17 +60,52 @@ class StabilityImageToVideo(StabilityBaseNode):
         
         generation_id = response.json()["id"]
         
-        # 生成完了まで待機
-        while True:
-            response = self.client._make_request(
-                "GET",
-                f"/v2beta/image-to-video/result/{generation_id}",
-                headers={"Accept": "video/*"}
-            )
-            
-            if response.status_code == 200:
-                # 生成完了
-                return (response.content,)
+        if response.status_code == 200:        
+            # 生成完了まで待機
+            while True:
+                response = self.client._make_request(
+                    "GET",
+                    f"/v2beta/image-to-video/result/{generation_id}",
+                    headers={"Accept": "video/*"}
+                )
+                
+                if response.status_code == 200:
+                    # ビデオデータをバイトストリームとして読み込む
+                    video_bytes = io.BytesIO(response.content)
+                    
+                    # 一時ファイルにビデオを保存
+                    temp_file = "temp_video.mp4"
+                    with open(temp_file, "wb") as f:
+                        f.write(response.content)
+                    
+                    # ビデオを読み込む
+                    cap = cv2.VideoCapture(temp_file)
+                    
+                    frames = []
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+                        # BGRからRGBに変換
+                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        frames.append(frame)
+                    
+                    cap.release()
+                    import os
+                    os.remove(temp_file)
+                    
+                    # フレームをnumpy配列に変換 [B, H, W, C]形式
+                    frames_array = np.stack(frames)
+                    # float32に変換し、0-1の範囲にスケーリング
+                    frames_array = frames_array.astype(np.float32) / 255.0
+                    # フレームをtorch.Tensorに変換（形状は[B, H, W, C]のまま）
+                    frames_tensor = torch.from_numpy(frames_array)
+                    
+                    return (frames_tensor,)
+                
+        else:
+            throw_error = response.json()["error"]
+            raise Exception(throw_error)
 
 class StabilityUpscaleFast(StabilityBaseNode):
     """Stability Fast Upscalerノード"""
