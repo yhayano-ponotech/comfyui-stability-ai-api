@@ -66,19 +66,25 @@ class StabilityAPIClient:
             APIレスポンス
         """
         url = f"{self.base_url}{endpoint}"
-        request_headers = self.headers.copy()
+        request_headers = {
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        
         if headers:
+            # Content-Typeヘッダーは削除（requestsが自動的に設定）
+            if "Content-Type" in headers:
+                del headers["Content-Type"]
             request_headers.update(headers)
             
+        # リクエストを実行
         response = requests.request(
             method=method,
             url=url,
-            json=data if not files else None,
-            data=data if files else None,
+            data=data,
             files=files,
             headers=request_headers
         )
-        
+            
         if response.status_code not in [200, 202]:
             raise Exception(f"API request failed with status {response.status_code}: {response.text}")
             
@@ -165,7 +171,12 @@ class StabilityAPIClient:
         Returns:
         --------
         torch.Tensor
-            変換された画像テンソル [H,W,C]
+            変換された画像テンソル [B,H,W,C] 形式
+            B: バッチサイズ (1)
+            H: 高さ
+            W: 幅
+            C: チャンネル数 (3: RGB)
+            値の範囲は0-1のfloat32型
         """
         # バイト列からPIL画像を作成
         image = Image.open(io.BytesIO(image_bytes))
@@ -174,8 +185,22 @@ class StabilityAPIClient:
         if image.mode != 'RGB':
             image = image.convert('RGB')
             
-        # テンソルに変換して返す
-        return self.pil_to_tensor(image)
+        # 画像サイズを確認
+        width, height = image.size
+        print(f"Image size: {width}x{height}")
+        
+        # PIL画像をnumpy配列に変換し、0-1の範囲に正規化
+        img_array = np.array(image).astype(np.float32) / 255.0
+        
+        # バッチ次元を追加 [B,H,W,C]
+        img_tensor = torch.from_numpy(img_array)
+        img_tensor = img_tensor.unsqueeze(0)  # (1, H, W, C)
+        
+        # メモリリークを防ぐためにPIL画像を明示的に閉じる
+        image.close()
+        
+        print(f"Tensor shape: {img_tensor.shape}, dtype: {img_tensor.dtype}")  # デバッグ情報
+        return img_tensor
 
     def check_balance(self) -> float:
         """

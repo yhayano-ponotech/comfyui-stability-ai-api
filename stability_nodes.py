@@ -18,7 +18,6 @@ class StabilityBaseNode:
             "optional": {
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "api_key": ("STRING", {"default": ""})
             }
         }
 
@@ -30,13 +29,8 @@ class StabilityBaseNode:
                 aspect_ratio: str,
                 negative_prompt: str = "",
                 seed: int = 0,
-                style_preset: str = "none",
-                api_key: str = "") -> Tuple[torch.Tensor]:
+                style_preset: str = "none") -> Tuple[torch.Tensor]:
         """画像を生成"""
-        
-        # API Keyが指定されていれば、それを使用
-        if api_key:
-            self.client = StabilityAPIClient(api_key)
 
         # リクエストデータの準備
         data = {
@@ -78,7 +72,6 @@ class StabilityImageToVideo(StabilityBaseNode):
                 "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
                 "cfg_scale": ("FLOAT", {"default": 1.8, "min": 0.0, "max": 10.0, "step": 0.1}),
                 "motion_bucket_id": ("INT", {"default": 127, "min": 1, "max": 255}),
-                "api_key": ("STRING", {"default": ""})
             }
         }
 
@@ -89,14 +82,9 @@ class StabilityImageToVideo(StabilityBaseNode):
                 image: torch.Tensor,
                 seed: int = 0,
                 cfg_scale: float = 1.8,
-                motion_bucket_id: int = 127,
-                api_key: str = "") -> Tuple[bytes]:
+                motion_bucket_id: int = 127) -> Tuple[bytes]:
         """画像からビデオを生成"""
         
-        # API Keyが指定されていれば、それを使用
-        if api_key:
-            self.client = StabilityAPIClient(api_key)
-
         # リクエストデータの準備
         data = {
             "seed": seed,
@@ -169,7 +157,6 @@ class StabilityImageSD3(StabilityBaseNode):
                         "pixel-art", "tile-texture"
                     ]
                 }),
-                "api_key": ("STRING", {"default": ""})
             }
         }
 
@@ -186,14 +173,9 @@ class StabilityImageSD3(StabilityBaseNode):
                 image: Optional[torch.Tensor] = None,
                 strength: float = 0.7,
                 aspect_ratio: str = "1:1",
-                style_preset: str = "none",
-                api_key: str = "") -> Tuple[torch.Tensor]:
+                style_preset: str = "none") -> Tuple[torch.Tensor]:
         """画像を生成"""
         
-        # API Keyが指定されていれば、それを使用
-        if api_key:
-            self.client = StabilityAPIClient(api_key)
-
         # リクエストデータの準備
         data = {
             "prompt": prompt,
@@ -241,7 +223,6 @@ class StabilityUpscaleFast(StabilityBaseNode):
                 "image": ("IMAGE",),
             },
             "optional": {
-                "api_key": ("STRING", {"default": ""})
             }
         }
 
@@ -249,14 +230,9 @@ class StabilityUpscaleFast(StabilityBaseNode):
     FUNCTION = "upscale"
     
     def upscale(self,
-                image: torch.Tensor,
-                api_key: str = "") -> Tuple[torch.Tensor]:
+                image: torch.Tensor) -> Tuple[torch.Tensor]:
         """画像をアップスケール"""
         
-        # API Keyが指定されていれば、それを使用
-        if api_key:
-            self.client = StabilityAPIClient(api_key)
-
         # リクエストデータの準備
         files = {"image": ("image.png", self.client.image_to_bytes(image))}
 
@@ -287,7 +263,6 @@ class StabilityUpscaleConservative(StabilityBaseNode):
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
                 "creativity": ("FLOAT", {"default": 0.35, "min": 0.2, "max": 0.5, "step": 0.01}),
-                "api_key": ("STRING", {"default": ""})
             }
         }
 
@@ -299,14 +274,9 @@ class StabilityUpscaleConservative(StabilityBaseNode):
                 prompt: str,
                 negative_prompt: str = "",
                 seed: int = 0,
-                creativity: float = 0.35,
-                api_key: str = "") -> Tuple[torch.Tensor]:
+                creativity: float = 0.35) -> Tuple[torch.Tensor]:
         """画像をアップスケール"""
         
-        # API Keyが指定されていれば、それを使用
-        if api_key:
-            self.client = StabilityAPIClient(api_key)
-
         # リクエストデータの準備
         data = {
             "prompt": prompt,
@@ -357,7 +327,6 @@ class StabilityUpscaleCreative(StabilityBaseNode):
                         "pixel-art", "tile-texture"
                     ]
                 }),
-                "api_key": ("STRING", {"default": ""})
             }
         }
 
@@ -370,14 +339,9 @@ class StabilityUpscaleCreative(StabilityBaseNode):
                 negative_prompt: str = "",
                 seed: int = 0,
                 creativity: float = 0.3,
-                style_preset: str = "none",
-                api_key: str = "") -> Tuple[torch.Tensor]:
+                style_preset: str = "none") -> Tuple[torch.Tensor]:
         """画像をアップスケール"""
         
-        # API Keyが指定されていれば、それを使用
-        if api_key:
-            self.client = StabilityAPIClient(api_key)
-
         # リクエストデータの準備
         data = {
             "prompt": prompt,
@@ -425,7 +389,6 @@ class StabilityEdit(StabilityBaseNode):
                 "grow_mask": ("INT", {"default": 5, "min": 0, "max": 100}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
                 "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
-                "api_key": ("STRING", {"default": ""})
             }
         }
 
@@ -440,14 +403,9 @@ class StabilityEdit(StabilityBaseNode):
             mask: Optional[torch.Tensor] = None,
             grow_mask: int = 5,
             seed: int = 0,
-            style_preset: str = "none",
-            api_key: str = "") -> Tuple[torch.Tensor]:
+            style_preset: str = "none") -> Tuple[torch.Tensor]:
         """画像を編集"""
         
-        # API Keyが指定されていれば、それを使用
-        if api_key:
-            self.client = StabilityAPIClient(api_key)
-
         # リクエストデータの準備
         data = {
             "prompt": prompt,
@@ -510,7 +468,6 @@ class StabilityImageUltra(StabilityBaseNode):
                         "pixel-art", "tile-texture"
                     ]
                 }),
-                "api_key": ("STRING", {"default": ""})
             }
         }
 
@@ -522,14 +479,9 @@ class StabilityImageUltra(StabilityBaseNode):
                 aspect_ratio: str,
                 negative_prompt: str = "",
                 seed: int = 0,
-                style_preset: str = "none",
-                api_key: str = "") -> Tuple[torch.Tensor]:
+                style_preset: str = "none") -> Tuple[torch.Tensor]:
         """画像を生成"""
         
-        # API Keyが指定されていれば、それを使用
-        if api_key:
-            self.client = StabilityAPIClient(api_key)
-
         # リクエストデータの準備
         data = {
             "prompt": prompt,
@@ -582,7 +534,6 @@ class StabilityImageCore(StabilityBaseNode):
                         "pixel-art", "tile-texture"
                     ]
                 }),
-                "api_key": ("STRING", {"default": ""})
             }
         }
 
@@ -594,20 +545,26 @@ class StabilityImageCore(StabilityBaseNode):
                 aspect_ratio: str,
                 negative_prompt: str = "",
                 seed: int = 0,
-                style_preset: str = "none",
-                api_key: str = "") -> Tuple[torch.Tensor]:
-        """画像を生成"""
+                style_preset: str = "none") -> Tuple[torch.Tensor]:
+        """画像を生成
         
-        # API Keyが指定されていれば、それを使用
-        if api_key:
-            self.client = StabilityAPIClient(api_key)
-
+        Returns:
+        --------
+        Tuple[torch.Tensor]
+            生成された画像テンソル。形式は [B,H,W,C]
+            B: バッチサイズ (1)
+            H: 高さ
+            W: 幅
+            C: チャンネル数 (3: RGB)
+            値の範囲は0-1のfloat32型
+        """
+        
         # リクエストデータの準備
         data = {
             "prompt": prompt,
             "aspect_ratio": aspect_ratio,
             "seed": seed,
-            "output_format": "png"
+            "output_format": "png"  # PNG形式で出力
         }
         
         if negative_prompt:
@@ -616,15 +573,52 @@ class StabilityImageCore(StabilityBaseNode):
         if style_preset != "none":
             data["style_preset"] = style_preset
 
-        # APIリクエストを実行
-        headers = {"Accept": "image/*"}
+        # APIリクエストを実行（画像データを直接受け取る）
+        headers = {
+            "Accept": "image/*"  # 画像データを直接受け取る
+        }
+        
+        # multipart/form-dataとしてデータを送信
+        files = {}
+        for key, value in data.items():
+            files[key] = (None, str(value))
+            
+        # デバッグ情報を出力
+        print("Request data:", files)
+        print("Request headers:", headers)
+            
         response = self.client._make_request(
             "POST", 
             "/v2beta/stable-image/generate/core", 
-            data=data,
+            files=files,
             headers=headers
         )
         
-        # レスポンスを画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(response.content)
+        # レスポンスのContent-Typeを確認
+        print("Response Content-Type:", response.headers.get('content-type'))
+        print("Response status code:", response.status_code)
+        
+        # Content-Typeに基づいて処理を分岐
+        content_type = response.headers.get('content-type', '')
+        if 'application/json' in content_type:
+            # JSONレスポンスの場合
+            response_data = response.json()
+            print("JSON Response:", response_data)
+            if 'artifacts' in response_data and response_data['artifacts']:
+                image_data = response_data['artifacts'][0].get('base64')
+                if image_data:
+                    import base64
+                    image_bytes = base64.b64decode(image_data)
+                else:
+                    raise Exception("No base64 image data in response")
+            else:
+                raise Exception("No artifacts in response")
+        elif 'image/' in content_type:
+            # 画像データの場合
+            image_bytes = response.content
+        else:
+            raise Exception(f"Unexpected content type: {content_type}")
+        
+        # バイト列を画像テンソルに変換
+        image_tensor = self.client.bytes_to_tensor(image_bytes)
         return (image_tensor,)
