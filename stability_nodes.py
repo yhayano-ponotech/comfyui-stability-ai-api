@@ -1040,6 +1040,21 @@ class StabilityEdit(StabilityBaseNode):
         Exception
             API呼び出しに失敗した場合
         """
+        # マスクの前処理を追加
+        if mask is not None and edit_type in ["erase", "inpaint"]:
+            # マスクの形状を確認
+            if len(mask.shape) == 4:  # [B,C,H,W]形式
+                mask = mask.squeeze(0).squeeze(0)  # [H,W]形式に変換
+            elif len(mask.shape) == 3:  # [B,H,W]形式
+                mask = mask.squeeze(0)  # [H,W]形式に変換
+            
+            # マスクの値を0-1の範囲に正規化
+            if mask.dtype != torch.float32:
+                mask = mask.float()
+            if mask.max() > 1.0:
+                mask = mask / 255.0
+
+        # 以下は既存のコード
         # 画像サイズのバリデーション
         height, width = image.shape[1:3]
         if width < 64 or height < 64:
@@ -1100,7 +1115,9 @@ class StabilityEdit(StabilityBaseNode):
         }
         
         if edit_type in ["erase", "inpaint"] and mask is not None:
-            files["mask"] = ("mask.png", self.client.image_to_bytes(mask))
+            # マスクをPNG形式のバイト列に変換
+            mask_bytes = self.client.image_to_bytes(mask)
+            files["mask"] = ("mask.png", mask_bytes)
 
         # APIリクエストを実行
         headers = {"Accept": "image/*"}
