@@ -1,6 +1,7 @@
 from .stability_nodes import StabilityImageUltra, StabilityImageCore, StabilityImageSD3
 from .stability_nodes import StabilityUpscaleFast, StabilityUpscaleConservative, StabilityUpscaleCreative
 from .stability_nodes import StabilityEdit, StabilityImageToVideo
+from .stability_nodes import StabilityControlSketch, StabilityControlStructure, StabilityControlStyle
 
 NODE_CLASS_MAPPINGS = {
     "StabilityImageUltra": StabilityImageUltra,
@@ -10,7 +11,10 @@ NODE_CLASS_MAPPINGS = {
     "StabilityUpscaleConservative": StabilityUpscaleConservative,
     "StabilityUpscaleCreative": StabilityUpscaleCreative,
     "StabilityEdit": StabilityEdit,
-    "StabilityImageToVideo": StabilityImageToVideo
+    "StabilityImageToVideo": StabilityImageToVideo,
+    "StabilityControlSketch": StabilityControlSketch,
+    "StabilityControlStructure": StabilityControlStructure,
+    "StabilityControlStyle": StabilityControlStyle
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -21,7 +25,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "StabilityUpscaleConservative": "Stability Conservative Upscaler",
     "StabilityUpscaleCreative": "Stability Creative Upscaler",
     "StabilityEdit": "Stability Image Editor",
-    "StabilityImageToVideo": "Stability Image to Video"
+    "StabilityImageToVideo": "Stability Image to Video",
+    "StabilityControlSketch": "Stability Sketch Control",
+    "StabilityControlStructure": "Stability Structure Control",
+    "StabilityControlStyle": "Stability Style Control"
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
