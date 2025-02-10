@@ -9,23 +9,22 @@ import io
 
 class StabilityAPIClient:
     """
-    Stability AI APIとの通信を行うクライアントクラス
+    Client class for communicating with the Stability AI API
     """
     def __init__(self, api_key: Optional[str] = None):
-        """
-        初期化
-        
+        """Initialize the client
+
         Parameters:
         -----------
         api_key : str, optional
-            Stability AI APIキー。未指定の場合は環境変数から読み込み
+            Stability AI API key. If not provided, will be loaded from environment variables
         """
         from .config_manager import ConfigManager
         
-        # APIキーの取得優先順位:
-        # 1. 直接指定されたAPIキー
-        # 2. 環境変数のAPIキー
-        # 3. config.iniのAPIキー
+        # Priority order for obtaining the API key:
+        # 1. Directly specified API key
+        # 2. API key from environment variables
+        # 3. API key from config.ini
         self.api_key = api_key or ConfigManager().get_api_key()
         
         if not self.api_key or self.api_key == "your_api_key_here":
@@ -44,26 +43,25 @@ class StabilityAPIClient:
                      data: Optional[Dict[str, Any]] = None,
                      files: Optional[Dict[str, Any]] = None,
                      headers: Optional[Dict[str, str]] = None) -> requests.Response:
-        """
-        API リクエストを実行
-        
+        """Make an API request
+
         Parameters:
         -----------
         method : str
-            HTTPメソッド ('GET', 'POST' etc.)
+            HTTP method ('GET', 'POST', etc.)
         endpoint : str
-            APIエンドポイント
+            API endpoint
         data : dict, optional
-            リクエストボディ
-        files : dict, optional 
-            アップロードするファイル
+            Request body
+        files : dict, optional
+            Files to upload
         headers : dict, optional
-            追加のヘッダー
+            Additional headers
             
         Returns:
         --------
         requests.Response
-            APIレスポンス
+            API response
         """
         url = f"{self.base_url}{endpoint}"
         request_headers = {
@@ -71,12 +69,12 @@ class StabilityAPIClient:
         }
         
         if headers:
-            # Content-Typeヘッダーは削除（requestsが自動的に設定）
+            # Remove Content-Type header (requests will set it automatically)
             if "Content-Type" in headers:
                 del headers["Content-Type"]
             request_headers.update(headers)
             
-        # リクエストを実行
+        # Make the request
         response = requests.request(
             method=method,
             url=url,
@@ -91,100 +89,97 @@ class StabilityAPIClient:
         return response
 
     def tensor_to_pil(self, image: torch.Tensor) -> Image.Image:
-        """
-        PyTorch tensor をPIL画像に変換
-        
+        """Convert a PyTorch tensor to a PIL image
+
         Parameters:
         -----------
         image : torch.Tensor
-            変換する画像テンソル。以下の形式をサポート:
-            - [H,W,C] : RGB画像
-            - [B,H,W,C] : RGBバッチ画像
-            - [H,W] : グレースケール画像/マスク
-            - [B,H,W] : グレースケールバッチ画像/マスク
-            - [1,1,H,W] : マスク特殊形式
+            Image tensor to convert. Supports the following formats:
+            - [H,W,C] : RGB image
+            - [B,H,W,C] : RGB batch image
+            - [H,W] : Grayscale image/mask
+            - [B,H,W] : Grayscale batch image/mask
+            - [1,1,H,W] : Special mask format
             
         Returns:
         --------
         PIL.Image
-            変換されたPIL画像
+            Converted PIL image
         """
-        # テンソルの形状を取得
+        # Get the tensor shape
         shape = image.shape
         
-        # バッチ次元を削除（必要な場合）
+        # Remove batch dimension (if necessary)
         if len(shape) == 4:
-            if shape[0] == 1:  # バッチサイズ1の場合
-                if shape[1] == 1:  # マスク特殊形式
+            if shape[0] == 1:  # Batch size 1
+                if shape[1] == 1:  # Special mask format
                     image = image.squeeze(0).squeeze(0)  # [1,1,H,W] -> [H,W]
                 else:
                     image = image.squeeze(0)  # [1,H,W,C] -> [H,W,C]
             else:
-                raise ValueError(f"バッチサイズ1以外はサポートしていません: {shape}")
+                raise ValueError(f"Only batch size 1 is supported: {shape}")
         
-        # テンソルをnumpy配列に変換
+        # Convert tensor to numpy array
         img_array = image.cpu().numpy()
         
-        # データ型と値の範囲を正規化
+        # Normalize data type and value range
         if img_array.dtype != np.uint8:
             img_array = (img_array * 255).astype(np.uint8)
         
-        # 形状に基づいて適切なモードでPIL画像を作成
+        # Create a PIL image in the correct mode based on the shape
         if len(img_array.shape) == 2:  # [H,W]
             pil_image = Image.fromarray(img_array, mode='L')
         elif len(img_array.shape) == 3:  # [H,W,C]
-            if img_array.shape[2] == 1:  # グレースケール
+            if img_array.shape[2] == 1:  # Grayscale
                 pil_image = Image.fromarray(img_array.squeeze(2), mode='L')
             elif img_array.shape[2] == 3:  # RGB
                 pil_image = Image.fromarray(img_array, mode='RGB')
             else:
-                raise ValueError(f"サポートされていないチャンネル数です: {img_array.shape[2]}")
+                raise ValueError(f"Unsupported number of channels: {img_array.shape[2]}")
         else:
-            raise ValueError(f"サポートされていない次元数です: {len(img_array.shape)}")
+            raise ValueError(f"Unsupported number of dimensions: {len(img_array.shape)}")
             
         return pil_image
 
     def pil_to_tensor(self, image: Image.Image) -> torch.Tensor:
-        """
-        PIL画像をPyTorch tensorに変換
-        
+        """Convert a PIL image to a PyTorch tensor
+
         Parameters:
         -----------
         image : PIL.Image
-            変換するPIL画像
+            Image to convert
             
         Returns:
         --------
         torch.Tensor
-            変換された画像テンソル [H,W,C]
+            Converted image tensor [H,W,C]
         """
-        # PIL画像をnumpy配列に変換
+        # Convert PIL image to numpy array
         img_array = np.array(image).astype(np.float32) / 255.0
         
-        # グレースケール画像の場合、チャンネル次元を追加
+        # Add channel dimension for grayscale images
         if len(img_array.shape) == 2:
             img_array = np.expand_dims(img_array, axis=2)
         
-        # numpyからPyTorchテンソルに変換
+        # Convert numpy array to PyTorch tensor
         img_tensor = torch.from_numpy(img_array)
         
         return img_tensor
 
     def image_to_bytes(self, image: Union[torch.Tensor, Image.Image], format: str = 'PNG') -> bytes:
-        """
-        画像をバイト列に変換
-        
+        """Convert an image to a byte array
+
         Parameters:
         -----------
         image : Union[torch.Tensor, Image.Image]
-            変換する画像(PyTorchテンソルまたはPIL画像)
+            Image to convert (PyTorch tensor or PIL image)
         format : str
-            出力フォーマット('PNG', 'JPEG', 'WEBP')
+            Output format ('PNG', 'JPEG', 'WEBP')
             
         Returns:
         --------
         bytes
-            画像のバイト列
+            Image byte array
         """
         if isinstance(image, torch.Tensor):
             image = self.tensor_to_pil(image)
@@ -194,56 +189,54 @@ class StabilityAPIClient:
         return img_byte_arr.getvalue()
 
     def bytes_to_tensor(self, image_bytes: bytes) -> torch.Tensor:
-        """
-        バイト列から画像テンソルに変換
-        
+        """Convert a byte array to an image tensor
+
         Parameters:
         -----------
         image_bytes : bytes
-            画像のバイト列
+            Image byte array
             
         Returns:
         --------
         torch.Tensor
-            変換された画像テンソル [B,H,W,C] 形式
-            B: バッチサイズ (1)
-            H: 高さ
-            W: 幅
-            C: チャンネル数 (3: RGB)
-            値の範囲は0-1のfloat32型
+            Converted image tensor [B,H,W,C] format
+            B: Batch size (1)
+            H: Height
+            W: Width
+            C: Number of channels (3: RGB)
+            Values are in the range 0-1, float32 type
         """
-        # バイト列からPIL画像を作成
+        # Create a PIL image from the byte array
         image = Image.open(io.BytesIO(image_bytes))
         
-        # RGB形式に変換
+        # Convert to RGB format
         if image.mode != 'RGB':
             image = image.convert('RGB')
             
-        # 画像サイズを確認
+        # Check image size
         width, height = image.size
         print(f"Image size: {width}x{height}")
         
-        # PIL画像をnumpy配列に変換し、0-1の範囲に正規化
+        # Convert PIL image to numpy array and normalize to 0-1 range
         img_array = np.array(image).astype(np.float32) / 255.0
         
-        # バッチ次元を追加 [B,H,W,C]
+        # Add batch dimension [B,H,W,C]
         img_tensor = torch.from_numpy(img_array)
         img_tensor = img_tensor.unsqueeze(0)  # (1, H, W, C)
         
-        # メモリリークを防ぐためにPIL画像を明示的に閉じる
+        # Close the PIL image to prevent memory leaks
         image.close()
         
-        print(f"Tensor shape: {img_tensor.shape}, dtype: {img_tensor.dtype}")  # デバッグ情報
+        print(f"Tensor shape: {img_tensor.shape}, dtype: {img_tensor.dtype}")  # Debug information
         return img_tensor
 
     def check_balance(self) -> float:
-        """
-        アカウントの残高を確認
-        
+        """Check the account balance
+
         Returns:
         --------
         float
-            利用可能なクレジット残高
+            Available credit balance
         """
         response = self._make_request('GET', '/v1/user/balance')
         return response.json()['credits']
