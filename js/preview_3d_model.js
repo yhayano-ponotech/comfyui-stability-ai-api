@@ -2,7 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 app.registerExtension({
-    name: "Comfy.SaveAndPreview3DModel",
+    name: "Comfy.Preview3DModel", // name属性を変更
     async setup() {
         // 3Dプレビューダイアログを作成
         const createPreviewDialog = (modelData, filename, fileType) => {
@@ -60,7 +60,7 @@ app.registerExtension({
                 margin-bottom: 10px;
             `;
             const title = document.createElement('h3');
-            title.textContent = `3D Preview: ${filename}`;
+            title.textContent = `3D Preview`; // タイトルからファイル名表示を削除
             title.style.margin = '0';
 
             const closeButton = document.createElement('button');
@@ -150,34 +150,20 @@ app.registerExtension({
                     const mtlLoader = new window.MTLLoader();
                     // マテリアルをロード
                     mtlLoader.load( 'http://localhost:8188/viewfile?filepath=C:\\Users\\User\\Desktop\\ai\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes\\comfyui-stability-ai-api\\examples\\output\\output.mtl', function( materials ) {
+                            materials.preload();
 
-                        materials.preload();
+                            // OBJローダーにマテリアルを設定
+                            loader.setMaterials( materials );
+                            loadOBJ(loader,modelUrl,scene,camera);
 
-                        // OBJローダーにマテリアルを設定
-                        loader.setMaterials( materials );
-
-                        // OBJファイルをロード
-                        loader.load( modelUrl, function ( object ) {
-                            scene.add( object );
-                            // モデルを中央に配置
-                            const box = new THREE.Box3().setFromObject(object);
-                            const center = box.getCenter(new THREE.Vector3());
-                            object.position.sub(center);
-
-                            // カメラ位置の自動調整
-                            const size = box.getSize(new THREE.Vector3());
-                            const maxDim = Math.max(size.x, size.y, size.z);
-                            camera.position.z = maxDim * 2;
-                            URL.revokeObjectURL(modelUrl);
-                            animate(); // アニメーション開始
-                        }, undefined, function ( error ) {
-                            console.error( 'An error happened during the loading of the OBJ model:', error );
-                            dialog.close();
-                        } );
-                    }, undefined, function ( error ) {
-                        console.error( 'An error happened during the loading of the MTL model:', error );
-                        dialog.close();
-                    });
+                        },
+                        // called when loading has errors
+                        function ( error ) {
+                            console.log( '[MTL Loader] An error happened:' + error );
+                            console.log( '[MTL Loader] Try to load obj without mtl.' );
+                            loadOBJ(loader,modelUrl,scene,camera); //mtlロードでエラーが出たら、mtlなしでobjをロード
+                        }
+                    );
                 } else if (fileType === 'ply'){
                     const { PLYLoader } = await import('https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/loaders/PLYLoader.js');
                     const loader = new PLYLoader();
@@ -211,6 +197,27 @@ app.registerExtension({
                     controls.update();
                     renderer.render(scene, camera);
                 }
+                
+                //objをロード(mtlのロードが失敗した場合も呼ばれる)
+                function loadOBJ(loader,modelUrl,scene,camera){
+                    // OBJファイルをロード
+                    loader.load( modelUrl, function ( object ) {
+                        scene.add( object );
+                        // モデルを中央に配置
+                        const box = new THREE.Box3().setFromObject(object);
+                        const center = box.getCenter(new THREE.Vector3());
+                        object.position.sub(center);
+
+                        // カメラ位置の自動調整
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        camera.position.z = maxDim * 2;
+                        animate(); // アニメーション開始
+                    }, undefined, function ( error ) {
+                        console.error( 'An error happened during the loading of the OBJ model:', error );
+                        dialog.close();
+                    } );
+                }
 
 
                 // ウィンドウリサイズ対応
@@ -232,10 +239,12 @@ app.registerExtension({
             initThreeJS();
         };
 
-        // プレビューメッセージのハンドラーを登録（イベント名と引数を修正）
+        // プレビューメッセージのハンドラーを登録
         api.addEventListener("preview_3d_model", (event) => {
             const { model_data, filename, model_type } = event.detail;
-            createPreviewDialog(model_data, filename, model_type.toLowerCase());
+
+            const uint8Array = new Uint8Array(model_data); //Uint8Arrayに変換
+            createPreviewDialog(uint8Array, filename, model_type.toLowerCase());
         });
 
     }
