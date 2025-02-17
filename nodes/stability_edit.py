@@ -36,7 +36,7 @@ class StabilityEdit(StabilityBaseNode):
                            "tile-texture"], {"default": "none"}),
             "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
             # search-and-replace, search-and-recolor用
-            "select_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "search_or_select_prompt": ("STRING", {"multiline": True, "default": ""}),
             "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
             # outpaint用
             "left": ("INT", {"default": 0, "min": 0, "max": 2000, "step":1}),
@@ -61,7 +61,7 @@ class StabilityEdit(StabilityBaseNode):
             seed: int = 0,
             style_preset: str = "none",
             output_format: str = "png",
-            select_prompt: str = "",
+            search_or_select_prompt: str = "",
             fidelity: float = 0.5,
             left: int = 0,
             right: int = 0,
@@ -102,8 +102,8 @@ class StabilityEdit(StabilityBaseNode):
             if mask is None:
                 raise ValueError(f"{edit_type}にはマスクが必要です")
         elif edit_type in ["search-and-replace", "search-and-recolor"]:
-            if not select_prompt:
-                raise ValueError(f"{edit_type}には select_prompt が必要です")
+            if not search_or_select_prompt:
+                raise ValueError(f"{edit_type}には search_or_select_prompt が必要です")
             if edit_type == "search-and-recolor":
                 if not 0 <= fidelity <= 1:
                     raise ValueError("fidelityは0から1の間である必要があります")
@@ -130,10 +130,11 @@ class StabilityEdit(StabilityBaseNode):
             data["grow_mask"] = grow_mask
 
         # 編集タイプごとの追加パラメータ
-        if edit_type in ["search-and-replace", "search-and-recolor"]:
-            data["select_prompt"] = select_prompt
-            if edit_type == "search-and-recolor":
-                data["fidelity"] = fidelity
+        if edit_type =="search-and-replace":
+            data["search_prompt"] = search_or_select_prompt
+        elif edit_type == "search-and-recolor":
+            data["select_prompt"] = search_or_select_prompt
+            data["fidelity"] = fidelity
         elif edit_type == "outpaint":
             data["creativity"] = creativity
             if left: data["left"] = left
