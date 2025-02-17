@@ -1,8 +1,9 @@
 import os
 from typing import Tuple
+from server import PromptServer
 
 class Save3DModel:
-    """3DモデルをGLBファイルとして保存するノード"""
+    """3DモデルをGLBファイルとして保存し、プレビューするノード"""
     
     @classmethod
     def INPUT_TYPES(s):
@@ -17,6 +18,7 @@ class Save3DModel:
     RETURN_NAMES = ()  # 出力名なし
     FUNCTION = "save_model"
     CATEGORY = "Stability AI"
+    OUTPUT_NODE = True
     
     def save_model(self, model_bytes: bytes, filename: str) -> Tuple:
         """3DモデルをGLBファイルとして保存"""
@@ -38,4 +40,13 @@ class Save3DModel:
             f.write(model_bytes)
             
         print(f"3D model saved to: {filepath}")
-        return ()  # 空のタプルを返す
+
+        # プレビュー用にクライアントにモデルデータを送信
+        import base64
+        model_base64 = base64.b64encode(model_bytes).decode('utf-8')
+        PromptServer.instance.send_sync("preview_3d_model", {
+            "model_data": model_base64,
+            "filename": filename
+        })
+            
+        return ()
