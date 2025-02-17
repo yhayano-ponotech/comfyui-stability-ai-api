@@ -1,7 +1,9 @@
 class Preview3DModel:
+    """3Dモデルをプレビュー表示するノード"""
+    
     def __init__(self):
         pass
-
+    
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -9,23 +11,40 @@ class Preview3DModel:
                 "model_3d": ("MODEL_3D",),
             },
         }
-
+    
     RETURN_TYPES = ()
     RETURN_NAMES = ()
     FUNCTION = "preview"
-    OUTPUT_NODE = False  # プレビュー表示のみで、次のノードには何も渡さない
-    CATEGORY = "3D/preview"  # カテゴリを修正
-
+    OUTPUT_NODE = True
+    CATEGORY = "Stability AI/preview"
+    
     def preview(self, model_3d):
-        # Save3DModelノードで処理されるため、ここでは何もしない
-        # イベントを発火させて、preview_3d_model.jsで受信する
+        """
+        3Dモデルをプレビュー表示する
+        
+        Parameters:
+        -----------
+        model_3d : dict
+            3Dモデルデータ。以下のキーを含む:
+            - string: モデルデータのバイト列
+            - mimetype: モデルのMIMEタイプ (例: "model/gltf-binary")
+        
+        Returns:
+        --------
+        tuple
+            空のタプル (このノードは出力を生成しない)
+        """
         from server import PromptServer
-        import struct
-        header = model_3d["mimetype"].encode('utf-8')
-        header_size = len(header)
-        model_bytes = model_3d["string"]
-         # ヘッダーのサイズ + ヘッダー + 実際のデータ
-        packed_data = struct.pack('<I', header_size) + header +model_bytes
-
-        PromptServer.instance.send_sync("preview_3d_model", {"model_data": packed_data, "filename": "filename", "model_type": model_3d["mimetype"]})
+        
+        # モデルタイプを取得 (例: "model/gltf-binary" -> "glb")
+        model_type = model_3d["mimetype"].split("/")[-1]
+        if model_type == "gltf-binary":
+            model_type = "glb"
+            
+        # プレビューイベントを発火
+        PromptServer.instance.send_sync("preview_3d_model", {
+            "model_data": model_3d["string"],  # モデルのバイナリデータ
+            "model_type": model_type,          # モデルの種類 (glb, obj, ply など)
+        })
+        
         return ()
