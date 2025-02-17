@@ -1,52 +1,44 @@
+# nodes/save_3d_model.py
 import os
 from typing import Tuple
-from server import PromptServer
 
 class Save3DModel:
-    """3DモデルをGLBファイルとして保存し、プレビューするノード"""
-    
+    """3DモデルをGLBファイルとして保存するノード"""
+
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "model_bytes": ("BYTES",), # GLBファイルのバイトデータ
-                "filename": ("STRING", {"default": "model.glb"}) # 保存するファイル名
-            }
+                "model_3d": ("MODEL_3D",), # GLBファイルのバイトデータ
+                "filename": ("STRING", {"default": "model"}),
+                "model_type": (["GLB", "OBJ", "PLY"], {"default": "GLB"}),
+            },
+             "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"}, #workflowの情報を保持
         }
-    
-    RETURN_TYPES = ()  # 出力なし
-    RETURN_NAMES = ()  # 出力名なし
+
+    RETURN_TYPES = ()
+    RETURN_NAMES = ()
     FUNCTION = "save_model"
-    CATEGORY = "Stability AI"
     OUTPUT_NODE = True
-    
-    def save_model(self, model_bytes: bytes, filename: str) -> Tuple:
+    CATEGORY = "Stability AI"
+
+    def save_model(self, model_3d, filename: str, model_type: str, prompt=None, extra_pnginfo=None) -> Tuple:
         """3DモデルをGLBファイルとして保存"""
-        
-        # ファイル名の検証
-        if not filename.endswith('.glb'):
-            filename += '.glb'
-            
+
+        model_bytes = model_3d["string"] # バイトデータを取得
+
         # 出力ディレクトリの作成
-        output_dir = 'output'
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "output")
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-            
+
         # ファイルパスの作成
-        filepath = os.path.join(output_dir, filename)
-        
+        filepath = os.path.join(output_dir, filename + "." + model_type.lower())
+
         # GLBファイルとして保存
         with open(filepath, 'wb') as f:
             f.write(model_bytes)
-            
-        print(f"3D model saved to: {filepath}")
 
-        # プレビュー用にクライアントにモデルデータを送信
-        import base64
-        model_base64 = base64.b64encode(model_bytes).decode('utf-8')
-        PromptServer.instance.send_sync("preview_3d_model", {
-            "model_data": model_base64,
-            "filename": filename
-        })
-            
+        print(f"[comfyui-stability-ai-api] Saved: {filepath}")
+
         return ()
