@@ -37,7 +37,6 @@ class StabilityEdit(StabilityBaseNode):
             "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
             # search-and-replace, search-and-recolor用
             "search_or_select_prompt": ("STRING", {"multiline": True, "default": ""}),
-            "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
             # outpaint用
             "left": ("INT", {"default": 0, "min": 0, "max": 2000, "step":1}),
             "right": ("INT", {"default": 0, "min": 0, "max": 2000, "step":1}),
@@ -62,7 +61,6 @@ class StabilityEdit(StabilityBaseNode):
             style_preset: str = "none",
             output_format: str = "png",
             search_or_select_prompt: str = "",
-            fidelity: float = 0.5,
             left: int = 0,
             right: int = 0,
             up: int = 0,
@@ -104,9 +102,6 @@ class StabilityEdit(StabilityBaseNode):
         elif edit_type in ["search-and-replace", "search-and-recolor"]:
             if not search_or_select_prompt:
                 raise ValueError(f"{edit_type}には search_or_select_prompt が必要です")
-            if edit_type == "search-and-recolor":
-                if not 0 <= fidelity <= 1:
-                    raise ValueError("fidelityは0から1の間である必要があります")
         elif edit_type == "outpaint":
             if not any([left, right, up, down]):
                 raise ValueError("outpaintには少なくとも1つの方向の拡張サイズが必要です")
@@ -134,7 +129,6 @@ class StabilityEdit(StabilityBaseNode):
             data["search_prompt"] = search_or_select_prompt
         elif edit_type == "search-and-recolor":
             data["select_prompt"] = search_or_select_prompt
-            data["fidelity"] = fidelity
         elif edit_type == "outpaint":
             data["creativity"] = creativity
             if left: data["left"] = left
