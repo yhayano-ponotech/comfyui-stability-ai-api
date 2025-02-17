@@ -28,10 +28,10 @@ NODE_CLASS_MAPPINGS = {
     "StabilityControlSketch": StabilityControlSketch,
     "StabilityControlStructure": StabilityControlStructure,
     "StabilityControlStyle": StabilityControlStyle,
-    "StableFast3D": StableFast3D,
-    "StablePointAware3D": StablePointAware3D,
-    "Save3DModel": Save3DModel,
-    "Preview3DModel": Preview3DModel,
+    # "StableFast3D": StableFast3D,
+    # "StablePointAware3D": StablePointAware3D,
+    # "Save3DModel": Save3DModel,
+    # "Preview3DModel": Preview3DModel,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -46,10 +46,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "StabilityControlSketch": "Stability Sketch Control",
     "StabilityControlStructure": "Stability Structure Control",
     "StabilityControlStyle": "Stability Style Control",
-    "StableFast3D": "Stability Fast 3D Generation",
-    "StablePointAware3D": "Stability Point Aware 3D",
-    "Save3DModel": "Save 3D Model",
-    "Preview3DModel": "Preview 3D Model", 
+    # "StableFast3D": "Stability Fast 3D Generation",
+    # "StablePointAware3D": "Stability Point Aware 3D",
+    # "Save3DModel": "Save 3D Model",
+    # "Preview3DModel": "Preview 3D Model", 
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
