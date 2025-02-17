@@ -10,30 +10,67 @@ class StabilityBaseNode:
     """StabilityAI APIノードの基底クラス"""
     CATEGORY = "Stability AI"
 
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "optional": {
+                "api_key": ("STRING", {"multiline": False, "default": ""})
+            }
+        }
+
     def __init__(self):
-        self.client = StabilityAPIClient()
+        self.client = None
         
+    def get_client(self, api_key: str = "") -> StabilityAPIClient:
+        """APIクライアントを取得
+        
+        Parameters
+        ----------
+        api_key : str, optional
+            APIキー。指定された場合、このキーを優先的に使用
+            
+        Returns
+        -------
+        StabilityAPIClient
+            APIクライアントインスタンス
+        """
+        # APIキーが変更された場合、または初回の場合は新しいクライアントを作成
+        if self.client is None or (api_key and api_key != self.client.api_key):
+            self.client = StabilityAPIClient(api_key if api_key else None)
+        return self.client
+
 class StabilityImageUltra(StabilityBaseNode):
     """Stability Ultra Image Generationノード"""
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "prompt": ("STRING", {"multiline": True}),
-                "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
-                                "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
-                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
-                "image": ("IMAGE",),  # 入力画像（オプション）
-                "strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),  # 画像の影響度
-            }
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+        if "optional" not in types:
+            types["optional"] = {}
+        
+        # required入力を追加
+        types["required"].update({
+            "prompt": ("STRING", {"multiline": True}),
+            "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
+        })
+        
+        # optional入力を追加
+        types["optional"].update({
+            "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
+            "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
+                            "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
+                            "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
+            "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+            "image": ("IMAGE",),  # 入力画像（オプション）
+            "strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),  # 画像の影響度
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "generate"
@@ -46,7 +83,8 @@ class StabilityImageUltra(StabilityBaseNode):
                 style_preset: str = "none",
                 output_format: str = "png",
                 image: Optional[torch.Tensor] = None,
-                strength: float = 0.7) -> Tuple[torch.Tensor]:
+                strength: float = 0.7,
+                api_key: str = "") -> Tuple[torch.Tensor]:
         """画像を生成
         
         Parameters
@@ -60,6 +98,8 @@ class StabilityImageUltra(StabilityBaseNode):
             画像の影響度（0.0〜1.0）。imageパラメータが指定されている場合は必須。
             0.0: 入力画像とまったく同じ
             1.0: 入力画像の影響なし
+        api_key : str, optional
+            APIキー。指定された場合、このキーを優先的に使用
         
         Returns
         --------
@@ -71,6 +111,9 @@ class StabilityImageUltra(StabilityBaseNode):
             C: チャンネル数 (3: RGB)
             値の範囲は0-1のfloat32型
         """
+        
+        # APIクライアントを取得（APIキーが指定されている場合はそれを使用）
+        client = self.get_client(api_key)
         
         # 入力画像のバリデーション
         if image is not None:
@@ -106,7 +149,7 @@ class StabilityImageUltra(StabilityBaseNode):
         files = {}
         if image is not None:
             data["strength"] = strength
-            files["image"] = ("image.png", self.client.image_to_bytes(image))
+            files["image"] = ("image.png", client.image_to_bytes(image))
         else:
             # text-to-imageの場合はアスペクト比を指定
             data["aspect_ratio"] = aspect_ratio
@@ -124,7 +167,7 @@ class StabilityImageUltra(StabilityBaseNode):
         print("Request data:", files)
         print("Request headers:", headers)
             
-        response = self.client._make_request(
+        response = client._make_request(
             "POST", 
             "/v2beta/stable-image/generate/ultra", 
             files=files,
@@ -157,7 +200,7 @@ class StabilityImageUltra(StabilityBaseNode):
             raise Exception(f"Unexpected content type: {content_type}")
         
         # バイト列を画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(image_bytes)
+        image_tensor = client.bytes_to_tensor(image_bytes)
         return (image_tensor,)
 
 class StabilityImageCore(StabilityBaseNode):
@@ -165,18 +208,25 @@ class StabilityImageCore(StabilityBaseNode):
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "prompt": ("STRING", {"default": "", "multiline": True}),
-                "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
-                "negative_prompt": ("STRING", {"default": "", "multiline": True}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
-                                "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
-                                "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
-            },
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+            
+        # required入力を追加
+        types["required"].update({
+            "prompt": ("STRING", {"default": "", "multiline": True}),
+            "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
+            "negative_prompt": ("STRING", {"default": "", "multiline": True}),
+            "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
+            "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", "comic-book", "digital-art", 
+                            "enhance", "fantasy-art", "isometric", "line-art", "low-poly", "modeling-compound", 
+                            "neon-punk", "origami", "photographic", "pixel-art", "tile-texture"], {"default": "none"}),
+            "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "generate"
@@ -229,7 +279,7 @@ class StabilityImageCore(StabilityBaseNode):
         print("Request data:", files)
         print("Request headers:", headers)
             
-        response = self.client._make_request(
+        response = self.get_client()._make_request(
             "POST", 
             "/v2beta/stable-image/generate/core", 
             files=files,
@@ -262,7 +312,7 @@ class StabilityImageCore(StabilityBaseNode):
             raise Exception(f"Unexpected content type: {content_type}")
         
         # バイト列を画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(image_bytes)
+        image_tensor = self.get_client().bytes_to_tensor(image_bytes)
         return (image_tensor,)
 
 class StabilityImageSD3(StabilityBaseNode):
@@ -270,23 +320,34 @@ class StabilityImageSD3(StabilityBaseNode):
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "prompt": ("STRING", {"multiline": True}),
-                "model": (["sd3.5-large", "sd3.5-large-turbo", "sd3.5-medium", "sd3-large", "sd3-large-turbo", "sd3-medium"],),
-                "mode": (["text-to-image", "image-to-image"],),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "cfg_scale": ("FLOAT", {"default": 7.0, "min": 1.0, "max": 10.0}),
-                "image": ("IMAGE",),
-                "strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0}),
-                "aspect_ratio": (["1:1", "3:2", "4:3", "16:9", "2:3", "3:4", "9:16"], {"default": "1:1"}),
-                "style_preset": (["none", "enhance", "anime", "photographic", "digital-art", "comic-book", "pixel-art", "cinematic", "3d-model", "origami"], {"default": "none"}),
-                "output_format": (["png", "webp"], {"default": "png"}),
-            }
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+        if "optional" not in types:
+            types["optional"] = {}
+            
+        # required入力を追加
+        types["required"].update({
+            "prompt": ("STRING", {"multiline": True}),
+            "model": (["sd3.5-large", "sd3.5-large-turbo", "sd3.5-medium", "sd3-large", "sd3-large-turbo", "sd3-medium"],),
+            "mode": (["text-to-image", "image-to-image"],),
+        })
+        
+        # optional入力を追加
+        types["optional"].update({
+            "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
+            "cfg_scale": ("FLOAT", {"default": 7.0, "min": 1.0, "max": 10.0}),
+            "image": ("IMAGE",),
+            "strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0}),
+            "aspect_ratio": (["1:1", "3:2", "4:3", "16:9", "2:3", "3:4", "9:16"], {"default": "1:1"}),
+            "style_preset": (["none", "enhance", "anime", "photographic", "digital-art", "comic-book", "pixel-art", "cinematic", "3d-model", "origami"], {"default": "none"}),
+            "output_format": (["png", "webp"], {"default": "png"}),
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "generate"
@@ -376,9 +437,9 @@ class StabilityImageSD3(StabilityBaseNode):
         headers = {"Accept": "image/*"}
         if mode == "image-to-image":
             files = {
-                "image": ("image.png", self.client.image_to_bytes(image))
+                "image": ("image.png", self.get_client().image_to_bytes(image))
             }
-            response = self.client._make_request(
+            response = self.get_client()._make_request(
                 "POST",
                 "/v2beta/stable-image/generate/sd3",
                 data=data,
@@ -402,17 +463,17 @@ class StabilityImageSD3(StabilityBaseNode):
                     import base64
                     image_bytes = base64.b64decode(image_data)
                 else:
-                    raise Exception("No base64 image data in response")
+                    raise Exception("No base64 data in artifact")
             else:
-                raise Exception("No artifacts in response")
+                raise Exception("No valid artifacts in response")
         elif 'image/' in content_type:
-            # 画像データの場合
+            # 直接画像データが返される場合
             image_bytes = response.content
         else:
             raise Exception(f"Unexpected content type: {content_type}")
 
-        # バイト列を画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(image_bytes)
+        # 画像データをテンソルに変換
+        image_tensor = self.get_client().bytes_to_tensor(image_bytes)
         return (image_tensor,)
 
 class StabilityImageToVideo(StabilityBaseNode):
@@ -420,16 +481,27 @@ class StabilityImageToVideo(StabilityBaseNode):
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-            },
-            "optional": {
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "cfg_scale": ("FLOAT", {"default": 1.8, "min": 0.0, "max": 10.0, "step": 0.1}),
-                "motion_bucket_id": ("INT", {"default": 127, "min": 1, "max": 255}),
-            }
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+        if "optional" not in types:
+            types["optional"] = {}
+            
+        # required入力を追加
+        types["required"].update({
+            "image": ("IMAGE",),
+        })
+        
+        # optional入力を追加
+        types["optional"].update({
+            "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
+            "cfg_scale": ("FLOAT", {"default": 1.8, "min": 0.0, "max": 10.0, "step": 0.1}),
+            "motion_bucket_id": ("INT", {"default": 127, "min": 1, "max": 255}),
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "generate"
@@ -449,11 +521,11 @@ class StabilityImageToVideo(StabilityBaseNode):
         }
 
         files = {
-            "image": ("image.png", self.client.image_to_bytes(image))
+            "image": ("image.png", self.get_client().image_to_bytes(image))
         }
 
         # 生成を開始
-        response = self.client._make_request(
+        response = self.get_client()._make_request(
             "POST",
             "/v2beta/image-to-video",
             data=data,
@@ -465,7 +537,7 @@ class StabilityImageToVideo(StabilityBaseNode):
         if response.status_code == 200:        
             # 生成完了まで待機
             while True:
-                response = self.client._make_request(
+                response = self.get_client()._make_request(
                     "GET",
                     f"/v2beta/image-to-video/result/{generation_id}",
                     headers={"Accept": "video/*"}
@@ -514,14 +586,25 @@ class StabilityUpscaleFast(StabilityBaseNode):
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-            },
-            "optional": {
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
-            }
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+        if "optional" not in types:
+            types["optional"] = {}
+            
+        # required入力を追加
+        types["required"].update({
+            "image": ("IMAGE",),
+        })
+        
+        # optional入力を追加
+        types["optional"].update({
+            "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "upscale"
@@ -536,9 +619,9 @@ class StabilityUpscaleFast(StabilityBaseNode):
         image : torch.Tensor
             入力画像。形式は[1, H, W, 3] (RGB)
             制限:
-            - 幅: 32-1536 px
-            - 高さ: 32-1536 px
-            - 総ピクセル数: 1024-1048576 px
+            - 幅: 32px以上16,384px以下
+            - 高さ: 32px以上16,384px以下
+            - 総ピクセル数: 1024px以上
         output_format : str, optional
             出力フォーマット, デフォルト: "png"
 
@@ -562,12 +645,12 @@ class StabilityUpscaleFast(StabilityBaseNode):
         }
 
         files = {
-            "image": ("image.png", self.client.image_to_bytes(image)),
+            "image": ("image.png", self.get_client().image_to_bytes(image)),
         }
 
         # APIリクエストを実行
         headers = {"Accept": "image/*"}
-        response = self.client._make_request(
+        response = self.get_client()._make_request(
             "POST", 
             "/v2beta/stable-image/upscale/fast", 
             data=data,
@@ -576,7 +659,7 @@ class StabilityUpscaleFast(StabilityBaseNode):
         )
         
         # レスポンスを画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(response.content)
+        image_tensor = self.get_client().bytes_to_tensor(response.content)
         return (image_tensor,)
 
 class StabilityUpscaleConservative(StabilityBaseNode):
@@ -586,23 +669,34 @@ class StabilityUpscaleConservative(StabilityBaseNode):
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "prompt": ("STRING", {"multiline": True}),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "creativity": ("FLOAT", {"default": 0.35, "min": 0.2, "max": 0.5, "step": 0.01}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
-                               "comic-book", "digital-art", "enhance", "fantasy-art", 
-                               "isometric", "line-art", "low-poly", "modeling-compound", 
-                               "neon-punk", "origami", "photographic", "pixel-art", 
-                               "tile-texture"], {"default": "none"}),
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
-            }
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+        if "optional" not in types:
+            types["optional"] = {}
+            
+        # required入力を追加
+        types["required"].update({
+            "image": ("IMAGE",),
+            "prompt": ("STRING", {"multiline": True}),
+        })
+        
+        # optional入力を追加
+        types["optional"].update({
+            "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
+            "creativity": ("FLOAT", {"default": 0.35, "min": 0.2, "max": 0.5, "step": 0.01}),
+            "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
+                           "comic-book", "digital-art", "enhance", "fantasy-art", 
+                           "isometric", "line-art", "low-poly", "modeling-compound", 
+                           "neon-punk", "origami", "photographic", "pixel-art", 
+                           "tile-texture"], {"default": "none"}),
+            "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "upscale"
@@ -683,7 +777,7 @@ class StabilityUpscaleConservative(StabilityBaseNode):
             data["style_preset"] = style_preset
 
         files = {
-            "image": ("image.png", self.client.image_to_bytes(image))
+            "image": ("image.png", self.get_client().image_to_bytes(image))
         }
 
         # 生成開始リクエスト - image/*を使用
@@ -691,7 +785,7 @@ class StabilityUpscaleConservative(StabilityBaseNode):
         print("Request data:", data)
         
         # クライアントに直接画像データを要求
-        response = self.client._make_request(
+        response = self.get_client()._make_request(
             "POST", 
             "/v2beta/stable-image/upscale/conservative", 
             data=data,
@@ -705,7 +799,7 @@ class StabilityUpscaleConservative(StabilityBaseNode):
         
         if 'image/' in content_type:
             # 画像データを直接テンソルに変換
-            image_tensor = self.client.bytes_to_tensor(response.content)
+            image_tensor = self.get_client().bytes_to_tensor(response.content)
             return (image_tensor,)
         else:
             raise Exception(f"Unexpected content type received: {content_type}")
@@ -717,23 +811,34 @@ class StabilityUpscaleCreative(StabilityBaseNode):
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "prompt": ("STRING", {"multiline": True}),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "creativity": ("FLOAT", {"default": 0.3, "min": 0.1, "max": 0.5, "step": 0.01}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
-                               "comic-book", "digital-art", "enhance", "fantasy-art", 
-                               "isometric", "line-art", "low-poly", "modeling-compound", 
-                               "neon-punk", "origami", "photographic", "pixel-art", 
-                               "tile-texture"], {"default": "none"}),
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
-            }
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+        if "optional" not in types:
+            types["optional"] = {}
+            
+        # required入力を追加
+        types["required"].update({
+            "image": ("IMAGE",),
+            "prompt": ("STRING", {"multiline": True}),
+        })
+        
+        # optional入力を追加
+        types["optional"].update({
+            "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
+            "creativity": ("FLOAT", {"default": 0.3, "min": 0.1, "max": 0.5, "step": 0.01}),
+            "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
+                           "comic-book", "digital-art", "enhance", "fantasy-art", 
+                           "isometric", "line-art", "low-poly", "modeling-compound", 
+                           "neon-punk", "origami", "photographic", "pixel-art", 
+                           "tile-texture"], {"default": "none"}),
+            "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "upscale"
@@ -815,14 +920,14 @@ class StabilityUpscaleCreative(StabilityBaseNode):
             data["style_preset"] = style_preset
 
         files = {
-            "image": ("image.png", self.client.image_to_bytes(image))
+            "image": ("image.png", self.get_client().image_to_bytes(image))
         }
 
         # 生成開始リクエスト
         print("Requesting upscale generation...")
         print("Request data:", data)
         
-        init_response = self.client._make_request(
+        init_response = self.get_client()._make_request(
             "POST", 
             "/v2beta/stable-image/upscale/creative", 
             data=data,
@@ -848,7 +953,7 @@ class StabilityUpscaleCreative(StabilityBaseNode):
                 print(f"Checking result... (attempt {retry_count + 1}/{max_retries})")
                 
                 # 結果取得リクエスト - application/jsonを使用
-                poll_response = self.client._make_request(
+                poll_response = self.get_client()._make_request(
                     "GET",
                     f"/v2beta/results/{generation_id}",
                     headers={"Accept": "*/*"}  # ヘッダーを*/*に変更
@@ -885,7 +990,7 @@ class StabilityUpscaleCreative(StabilityBaseNode):
                         raise Exception(f"Unexpected content type: {content_type}")
                     
                     # 画像データをテンソルに変換
-                    image_tensor = self.client.bytes_to_tensor(image_data)
+                    image_tensor = self.get_client().bytes_to_tensor(image_data)
                     return (image_tensor,)
                     
                 elif poll_response.status_code == 202:
@@ -916,35 +1021,46 @@ class StabilityEdit(StabilityBaseNode):
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "edit_type": (["erase", "inpaint", "outpaint", "search-and-replace", 
-                             "search-and-recolor", "remove-background"],),
-                "prompt": ("STRING", {"multiline": True}),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "mask": ("MASK",),
-                "grow_mask": ("INT", {"default": 5, "min": 0, "max": 100}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
-                               "comic-book", "digital-art", "enhance", "fantasy-art", 
-                               "isometric", "line-art", "low-poly", "modeling-compound", 
-                               "neon-punk", "origami", "photographic", "pixel-art", 
-                               "tile-texture"], {"default": "none"}),
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
-                # search-and-replace, search-and-recolor用
-                "select_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
-                # outpaint用
-                "left": ("INT", {"default": 0, "min": 0, "max": 2000}),
-                "right": ("INT", {"default": 0, "min": 0, "max": 2000}),
-                "up": ("INT", {"default": 0, "min": 0, "max": 2000}),
-                "down": ("INT", {"default": 0, "min": 0, "max": 2000}),
-                "creativity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
-            }
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+        if "optional" not in types:
+            types["optional"] = {}
+            
+        # required入力を追加
+        types["required"].update({
+            "image": ("IMAGE",),
+            "edit_type": (["erase", "inpaint", "outpaint", "search-and-replace", 
+                         "search-and-recolor", "remove-background"],),
+            "prompt": ("STRING", {"multiline": True}),
+        })
+        
+        # optional入力を追加
+        types["optional"].update({
+            "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "mask": ("MASK",),
+            "grow_mask": ("INT", {"default": 5, "min": 0, "max": 100}),
+            "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
+            "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
+                           "comic-book", "digital-art", "enhance", "fantasy-art", 
+                           "isometric", "line-art", "low-poly", "modeling-compound", 
+                           "neon-punk", "origami", "photographic", "pixel-art", 
+                           "tile-texture"], {"default": "none"}),
+            "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+            # search-and-replace, search-and-recolor用
+            "select_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
+            # outpaint用
+            "left": ("INT", {"default": 0, "min": 0, "max": 2000}),
+            "right": ("INT", {"default": 0, "min": 0, "max": 2000}),
+            "up": ("INT", {"default": 0, "min": 0, "max": 2000}),
+            "down": ("INT", {"default": 0, "min": 0, "max": 2000}),
+            "creativity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "edit"
@@ -1111,17 +1227,17 @@ class StabilityEdit(StabilityBaseNode):
 
         # ファイルの準備
         files = {
-            "image": ("image.png", self.client.image_to_bytes(image))
+            "image": ("image.png", self.get_client().image_to_bytes(image))
         }
         
         if edit_type in ["erase", "inpaint"] and mask is not None:
             # マスクをPNG形式のバイト列に変換
-            mask_bytes = self.client.image_to_bytes(mask)
+            mask_bytes = self.get_client().image_to_bytes(mask)
             files["mask"] = ("mask.png", mask_bytes)
 
         # APIリクエストを実行
         headers = {"Accept": "image/*"}
-        response = self.client._make_request(
+        response = self.get_client()._make_request(
             "POST", 
             f"/v2beta/stable-image/edit/{edit_type}", 
             data=data,
@@ -1130,7 +1246,7 @@ class StabilityEdit(StabilityBaseNode):
         )
         
         # レスポンスを画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(response.content)
+        image_tensor = self.get_client().bytes_to_tensor(response.content)
         return (image_tensor,)
 
 class StabilityControlSketch(StabilityBaseNode):
@@ -1140,23 +1256,34 @@ class StabilityControlSketch(StabilityBaseNode):
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "prompt": ("STRING", {"multiline": True}),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "control_strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
-                               "comic-book", "digital-art", "enhance", "fantasy-art", 
-                               "isometric", "line-art", "low-poly", "modeling-compound", 
-                               "neon-punk", "origami", "photographic", "pixel-art", 
-                               "tile-texture"], {"default": "none"}),
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
-            }
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+        if "optional" not in types:
+            types["optional"] = {}
+            
+        # required入力を追加
+        types["required"].update({
+            "image": ("IMAGE",),
+            "prompt": ("STRING", {"multiline": True}),
+        })
+        
+        # optional入力を追加
+        types["optional"].update({
+            "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "control_strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
+            "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
+            "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
+                           "comic-book", "digital-art", "enhance", "fantasy-art", 
+                           "isometric", "line-art", "low-poly", "modeling-compound", 
+                           "neon-punk", "origami", "photographic", "pixel-art", 
+                           "tile-texture"], {"default": "none"}),
+            "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "generate"
@@ -1226,12 +1353,12 @@ class StabilityControlSketch(StabilityBaseNode):
 
         # ファイルの準備
         files = {
-            "image": ("image.png", self.client.image_to_bytes(image))
+            "image": ("image.png", self.get_client().image_to_bytes(image))
         }
 
         # APIリクエストを実行
         headers = {"Accept": "image/*"}
-        response = self.client._make_request(
+        response = self.get_client()._make_request(
             "POST", 
             "/v2beta/stable-image/control/sketch", 
             data=data,
@@ -1240,7 +1367,7 @@ class StabilityControlSketch(StabilityBaseNode):
         )
         
         # レスポンスを画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(response.content)
+        image_tensor = self.get_client().bytes_to_tensor(response.content)
         return (image_tensor,)
 
 class StabilityControlStructure(StabilityBaseNode):
@@ -1250,23 +1377,34 @@ class StabilityControlStructure(StabilityBaseNode):
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "prompt": ("STRING", {"multiline": True}),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "control_strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
-                               "comic-book", "digital-art", "enhance", "fantasy-art", 
-                               "isometric", "line-art", "low-poly", "modeling-compound", 
-                               "neon-punk", "origami", "photographic", "pixel-art", 
-                               "tile-texture"], {"default": "none"}),
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
-            }
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+        if "optional" not in types:
+            types["optional"] = {}
+            
+        # required入力を追加
+        types["required"].update({
+            "image": ("IMAGE",),
+            "prompt": ("STRING", {"multiline": True}),
+        })
+        
+        # optional入力を追加
+        types["optional"].update({
+            "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "control_strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
+            "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
+            "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
+                           "comic-book", "digital-art", "enhance", "fantasy-art", 
+                           "isometric", "line-art", "low-poly", "modeling-compound", 
+                           "neon-punk", "origami", "photographic", "pixel-art", 
+                           "tile-texture"], {"default": "none"}),
+            "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "generate"
@@ -1336,12 +1474,12 @@ class StabilityControlStructure(StabilityBaseNode):
 
         # ファイルの準備
         files = {
-            "image": ("image.png", self.client.image_to_bytes(image))
+            "image": ("image.png", self.get_client().image_to_bytes(image))
         }
 
         # APIリクエストを実行
         headers = {"Accept": "image/*"}
-        response = self.client._make_request(
+        response = self.get_client()._make_request(
             "POST", 
             "/v2beta/stable-image/control/structure", 
             data=data,
@@ -1350,7 +1488,7 @@ class StabilityControlStructure(StabilityBaseNode):
         )
         
         # レスポンスを画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(response.content)
+        image_tensor = self.get_client().bytes_to_tensor(response.content)
         return (image_tensor,)
 
 class StabilityControlStyle(StabilityBaseNode):
@@ -1360,24 +1498,35 @@ class StabilityControlStyle(StabilityBaseNode):
     
     @classmethod
     def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "prompt": ("STRING", {"multiline": True}),
-            },
-            "optional": {
-                "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
-                "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
-                               "comic-book", "digital-art", "enhance", "fantasy-art", 
-                               "isometric", "line-art", "low-poly", "modeling-compound", 
-                               "neon-punk", "origami", "photographic", "pixel-art", 
-                               "tile-texture"], {"default": "none"}),
-                "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
-            }
-        }
+        # 親クラスのINPUT_TYPESを取得
+        types = super().INPUT_TYPES()
+        # 必要な入力を追加
+        if "required" not in types:
+            types["required"] = {}
+        if "optional" not in types:
+            types["optional"] = {}
+            
+        # required入力を追加
+        types["required"].update({
+            "image": ("IMAGE",),
+            "prompt": ("STRING", {"multiline": True}),
+        })
+        
+        # optional入力を追加
+        types["optional"].update({
+            "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
+            "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
+            "aspect_ratio": (["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"], {"default": "1:1"}),
+            "seed": ("INT", {"default": 0, "min": 0, "max": 4294967295}),
+            "style_preset": (["none", "3d-model", "analog-film", "anime", "cinematic", 
+                           "comic-book", "digital-art", "enhance", "fantasy-art", 
+                           "isometric", "line-art", "low-poly", "modeling-compound", 
+                           "neon-punk", "origami", "photographic", "pixel-art", 
+                           "tile-texture"], {"default": "none"}),
+            "output_format": (["png", "jpeg", "webp"], {"default": "png"}),
+        })
+        
+        return types
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "generate"
@@ -1452,12 +1601,12 @@ class StabilityControlStyle(StabilityBaseNode):
 
         # ファイルの準備
         files = {
-            "image": ("image.png", self.client.image_to_bytes(image))
+            "image": ("image.png", self.get_client().image_to_bytes(image))
         }
 
         # APIリクエストを実行
         headers = {"Accept": "image/*"}
-        response = self.client._make_request(
+        response = self.get_client()._make_request(
             "POST", 
             "/v2beta/stable-image/control/style", 
             data=data,
@@ -1466,5 +1615,5 @@ class StabilityControlStyle(StabilityBaseNode):
         )
         
         # レスポンスを画像テンソルに変換
-        image_tensor = self.client.bytes_to_tensor(response.content)
+        image_tensor = self.get_client().bytes_to_tensor(response.content)
         return (image_tensor,)
