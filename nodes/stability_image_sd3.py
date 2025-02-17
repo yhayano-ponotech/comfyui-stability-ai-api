@@ -100,6 +100,9 @@ class StabilityImageSD3(StabilityBaseNode):
                 headers=headers
             )
         
+        # レスポンスの処理とエラーチェック
+        self.handle_response(response, "image/*")
+        
         # Content-Typeに基づいて処理を分岐
         content_type = response.headers.get('content-type', '')
         if 'application/json' in content_type:

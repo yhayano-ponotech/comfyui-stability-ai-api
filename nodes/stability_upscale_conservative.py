@@ -88,6 +88,9 @@ class StabilityUpscaleConservative(StabilityBaseNode):
             files=files,
             headers={"Accept": "image/*"}
         )
+        
+        # レスポンスの処理とエラーチェック
+        self.handle_response(response, "image/*")
 
         # Content-Typeに基づいて処理
         content_type = response.headers.get('content-type', '')

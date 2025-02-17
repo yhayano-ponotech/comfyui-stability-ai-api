@@ -88,6 +88,9 @@ class StabilityControlStructure(StabilityBaseNode):
             files=files,
             headers=headers
         )
+        
+        # レスポンスの処理とエラーチェック
+        self.handle_response(response, "image/*")
 
         # レスポンスを画像テンソルに変換
         image_tensor = client.bytes_to_tensor(response.content)

@@ -74,40 +74,42 @@ class StabilityImageToVideo(StabilityBaseNode):
                     f"/v2beta/image-to-video/result/{generation_id}",
                     headers={"Accept": "video/*"}
                 )
+                
+                # レスポンスの処理とエラーチェック
+                self.handle_response(response, "video/*")
 
-                if response.status_code == 200:
-                    # ビデオデータをバイトストリームとして読み込む
-                    video_bytes = io.BytesIO(response.content)
+                # ビデオデータをバイトストリームとして読み込む
+                video_bytes = io.BytesIO(response.content)
 
-                    # 一時ファイルにビデオを保存
-                    temp_file = "temp_video.mp4"
-                    with open(temp_file, "wb") as f:
-                        f.write(response.content)
+                # 一時ファイルにビデオを保存
+                temp_file = "temp_video.mp4"
+                with open(temp_file, "wb") as f:
+                    f.write(response.content)
 
-                    # ビデオを読み込む
-                    cap = cv2.VideoCapture(temp_file)
+                # ビデオを読み込む
+                cap = cv2.VideoCapture(temp_file)
 
-                    frames = []
-                    while True:
-                        ret, frame = cap.read()
-                        if not ret:
-                            break
-                        # BGRからRGBに変換
-                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        frames.append(frame)
+                frames = []
+                while True:
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+                    # BGRからRGBに変換
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frames.append(frame)
 
-                    cap.release()
-                    import os
-                    os.remove(temp_file)
+                cap.release()
+                import os
+                os.remove(temp_file)
 
-                    # フレームをnumpy配列に変換 [B, H, W, C]形式
-                    frames_array = np.stack(frames)
-                    # float32に変換し、0-1の範囲にスケーリング
-                    frames_array = frames_array.astype(np.float32) / 255.0
-                    # フレームをtorch.Tensorに変換（形状は[B, H, W, C]のまま）
-                    frames_tensor = torch.from_numpy(frames_array)
+                # フレームをnumpy配列に変換 [B, H, W, C]形式
+                frames_array = np.stack(frames)
+                # float32に変換し、0-1の範囲にスケーリング
+                frames_array = frames_array.astype(np.float32) / 255.0
+                # フレームをtorch.Tensorに変換（形状は[B, H, W, C]のまま）
+                frames_tensor = torch.from_numpy(frames_array)
 
-                    return (frames_tensor,)
+                return (frames_tensor,)
 
         else:
             throw_error = response.json()["error"]
