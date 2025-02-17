@@ -5,7 +5,7 @@ app.registerExtension({
     name: "Comfy.Preview3DModel", // name属性を変更
     async setup() {
         // 3Dプレビューダイアログを作成
-        const createPreviewDialog = (modelData, filename, fileType) => {
+        const createPreviewDialog = (arrayBuffer, filename, fileType) => {
 
             // Three.jsのスクリプトを動的に読み込み
             const loadThreeJS = async () => {
@@ -239,12 +239,14 @@ app.registerExtension({
             initThreeJS();
         };
 
-        // プレビューメッセージのハンドラーを登録
-        api.addEventListener("preview_3d_model", (event) => {
+        // プレビューメッセージのハンドラーを登録（イベント名と引数を修正）
+        api.addEventListener("preview_3d_model", (event) => { //イベント名を変更
             const { model_data, filename, model_type } = event.detail;
 
-            const uint8Array = new Uint8Array(model_data); //Uint8Arrayに変換
-            createPreviewDialog(uint8Array, filename, model_type.toLowerCase());
+            // modelData を ArrayBuffer に変換
+            const uint8Array = new Uint8Array(model_data);
+            const arrayBuffer = uint8Array.buffer;
+            createPreviewDialog(arrayBuffer, filename, model_type.toLowerCase()); //ArrayBufferを渡す
         });
 
     }
