@@ -1,6 +1,8 @@
 import os
 from typing import Tuple
 from server import PromptServer
+import io
+import base64
 
 class Save3DModel:
     """3DモデルをGLBファイルとして保存し、プレビューするノード"""
@@ -41,12 +43,10 @@ class Save3DModel:
             
         print(f"3D model saved to: {filepath}")
 
-        # プレビュー用にクライアントにモデルデータを送信
-        import base64
-        model_base64 = base64.b64encode(model_bytes).decode('utf-8')
+        # バイトデータを直接送信
         PromptServer.instance.send_sync("preview_3d_model", {
-            "model_data": model_base64,
+            "model_data": model_bytes.decode("latin-1"), # 重要: latin-1でデコード/エンコード
             "filename": filename
-        })
+        })        
             
         return ()

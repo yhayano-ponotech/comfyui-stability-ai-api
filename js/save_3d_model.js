@@ -6,6 +6,7 @@ app.registerExtension({
     async setup() {
         // 3Dプレビューダイアログを作成
         const createPreviewDialog = (modelData, filename) => {
+
             // Three.jsのスクリプトを動的に読み込み
             const loadThreeJS = async () => {
                 if (window.THREE) return;
@@ -114,7 +115,11 @@ app.registerExtension({
 
                 // GLBファイルを読み込み
                 const loader = new THREE.GLTFLoader();
-                const modelBlob = new Blob([Uint8Array.from(atob(modelData), c => c.charCodeAt(0))], { type: 'model/gltf-binary' });
+
+                // 重要: latin1でエンコードされた文字列からUint8Arrayを作成
+                const uint8Array = new Uint8Array([...modelData].map(char => char.charCodeAt(0)));
+                const modelBlob = new Blob([uint8Array], { type: 'model/gltf-binary' });
+
                 const modelUrl = URL.createObjectURL(modelBlob);
 
                 loader.load(modelUrl, (gltf) => {
@@ -130,7 +135,7 @@ app.registerExtension({
                     const maxDim = Math.max(size.x, size.y, size.z);
                     camera.position.z = maxDim * 2;
                     
-                    URL.revokeObjectURL(modelUrl);
+                    URL.revokeObjectURL(modelUrl); // Blob URLを解放
                 });
 
                 // アニメーションループ
