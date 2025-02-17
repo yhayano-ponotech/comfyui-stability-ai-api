@@ -1,11 +1,18 @@
-from .stability_nodes import StabilityImageUltra, StabilityImageCore, StabilityImageSD3
-from .stability_nodes import StabilityUpscaleFast, StabilityUpscaleConservative, StabilityUpscaleCreative
-from .stability_nodes import StabilityEdit, StabilityImageToVideo
-from .stability_nodes import StabilityControlSketch, StabilityControlStructure, StabilityControlStyle
+from .nodes.stability_image_ultra import StabilityImageUltra
+from .nodes.stability_image_core import StabilityImageCore
+from .nodes.stability_image_sd3 import StabilityImageSD3
+from .nodes.stability_upscale_fast import StabilityUpscaleFast
+from .nodes.stability_upscale_conservative import StabilityUpscaleConservative
+from .nodes.stability_upscale_creative import StabilityUpscaleCreative
+from .nodes.stability_edit import StabilityEdit
+from .nodes.stability_image_to_video import StabilityImageToVideo
+from .nodes.stability_control_sketch import StabilityControlSketch
+from .nodes.stability_control_structure import StabilityControlStructure
+from .nodes.stability_control_style import StabilityControlStyle
 
 NODE_CLASS_MAPPINGS = {
     "StabilityImageUltra": StabilityImageUltra,
-    "StabilityImageCore": StabilityImageCore, 
+    "StabilityImageCore": StabilityImageCore,
     "StabilityImageSD3": StabilityImageSD3,
     "StabilityUpscaleFast": StabilityUpscaleFast,
     "StabilityUpscaleConservative": StabilityUpscaleConservative,
