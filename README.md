@@ -31,14 +31,7 @@
 
 ## Installation
 
-You can install the package directly via pip from GitHub:
-
-```bash
-pip install https://github.com/yhayano-ponotech/comfyui-stability-ai-api/archive/refs/tags/v1.0.1.zip
-
-```
-
-Or clone the repository and install the dependencies:
+You can install this custom nodes via ComfyUI Manager, or clone the repository and install the dependencies:
 
 ```bash
 git clone https://github.com/yhayano-ponotech/comfyui-stability-ai-api.git
